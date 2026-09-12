@@ -1,13 +1,51 @@
+
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+# Beads / Dolt files (added by bd init)
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# debug
+# dependencies
+# env files (can opt-in for committing if needed)
+# misc
+# next.js
+# production
+# testing
+# typescript
+# vercel
+*.db
+*.pem
+*.tsbuildinfo
+.DS_Store
+.beads-credential-key
+.beads-epics
+.beads-ids
+.beads/proxieddb/
+.dolt/
+.env
+.env*
+.env.local
+.flightdeck/agent-status
+.flightdeck/hooks.toml
+.flightdeck/runtime/
 .flightdeck/state.json
 .flightdeck/worktrees/
-.flightdeck/agent-status
-.flightdeck/runtime/
-.flightdeck/hooks.toml
-.env
-.env.local
-
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
-.beads-credential-key
-.beads/proxieddb/
+.pnp.*
+.pnpm-debug.log*
+.task-desk/
+.vercel
+.yarn/*
+/.next/
+/.pnp
+/build
+/coverage
+/node_modules
+/out/
+__probe.ts
+next-env.d.ts
+npm-debug.log*
+playwright-report/
+test-results/
+yarn-debug.log*
+yarn-error.log*

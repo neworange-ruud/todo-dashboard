@@ -1,0 +1,559 @@
+/**
+ * The drill-in panel (PRD §8, §10, §11).
+ *
+ * Every value is a token from app/globals.css. The §10 rules hold here exactly as they do
+ * on the landing view, and the panel is the place they are most tempting to break:
+ *
+ *   - NO box-shadow. The panel separates from the dimmed dashboard with a 1px rule and the
+ *     backdrop, not with a lift. It is the `raised` surface, which is the last elevation
+ *     level there is.
+ *   - Radius 0 on the panel itself (structural), 2px on the things you can press.
+ *   - The 2px left stripe appears once: on a block whose source failed — the "source-failed
+ *     notice" §10 explicitly allows. Nowhere else, for nothing decorative.
+ *   - Times and durations are tabular.
+ *
+ * Motion (PRD §11): in over 280ms on cubic-bezier(.22,.7,.3,1) with the backdrop dimming to
+ * 45% over the same interval; out in 200ms, because leaving is always faster than arriving.
+ * Transform and opacity only — nothing here animates layout.
+ */
+
+.backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  border: 0;
+  /* The dashboard stays visible through it: dimmed, never hidden. Context is never lost. */
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  opacity: 1;
+  animation: dim 280ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+.backdropClosing {
+  animation: dim 200ms cubic-bezier(0.22, 0.7, 0.3, 1) reverse forwards;
+}
+
+@keyframes dim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ====================================================================== */
+/* The panel — desktop: 480px, from the right                             */
+/* ====================================================================== */
+
+.panel {
+  position: fixed;
+  z-index: 41;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: 480px;
+  max-width: 100vw;
+  flex-direction: column;
+  border-left: 1px solid var(--color-rule);
+  border-radius: 0;
+  background: var(--color-raised);
+  animation: slide-in 280ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+.panelClosing {
+  animation: slide-in 200ms cubic-bezier(0.22, 0.7, 0.3, 1) reverse forwards;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* ====================================================================== */
+/* Header — breadcrumb trail, title, close                                */
+/* ====================================================================== */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-rule);
+  gap: var(--space-2);
+}
+
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* `Acme sync › ACME-214 › Migration` — one panel, one trail. */
+.trail {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.crumb {
+  overflow: hidden;
+  max-width: 18ch;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-overflow: ellipsis;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.crumb:hover {
+  color: var(--color-accent);
+}
+
+.crumbCurrent {
+  color: var(--color-ink-2);
+  cursor: default;
+}
+
+.crumbSeparator {
+  color: var(--color-ink-3);
+}
+
+/* Drill-in title: Newsreader 400 · 20/26 (PRD §10). Written for the reader, so serif. */
+.title {
+  font-family: var(--font-serif, ui-serif, Georgia, serif);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 26px;
+}
+
+.subtitle {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.iconButton {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.iconButton:hover {
+  background: var(--color-sunken);
+  color: var(--color-ink);
+}
+
+/* ====================================================================== */
+/* Blocks                                                                 */
+/* ====================================================================== */
+
+.blocks {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+}
+
+.block {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-rule-soft);
+}
+
+.block:last-child {
+  border-bottom: 0;
+}
+
+/*
+ * The single use of the 2px left stripe in this file: a source that failed. §10 lists
+ * "source-failed notice" as one of its three legal homes.
+ */
+.blockFailed {
+  padding-left: calc(var(--space-4) - 2px);
+}
+
+.blockHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.blockTitle {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--color-ink-2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Every block carries its own state on the right (PRD §8). */
+.blockStatus {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.statusFailed {
+  color: var(--color-critical);
+}
+
+.retry {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: underline;
+  text-transform: inherit;
+}
+
+.blockBody {
+  margin-top: var(--space-2);
+}
+
+/* Resolving is a cross-fade with a 3px rise, never a pop (PRD §11). */
+.arrive {
+  animation: arrive 250ms ease-out;
+}
+
+@keyframes arrive {
+  from {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* The container is already the right size, so the skeleton reserves it exactly. */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonLine {
+  height: 13px;
+  background: var(--color-sunken);
+}
+
+.skeletonLine:last-child {
+  width: 58%;
+}
+
+/* ====================================================================== */
+/* Rows — attendees and action items are lists, so they are rows          */
+/* ====================================================================== */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowButton {
+  cursor: pointer;
+  font: inherit;
+}
+
+.rowButton:hover .rowTitle {
+  color: var(--color-accent);
+}
+
+.rowMain {
+  min-width: 0;
+}
+
+.rowTitle {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
+.rowRight {
+  flex: 0 0 auto;
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Internal / external is a fact about the room, not a state — so it is ink, not colour. */
+.tag {
+  color: var(--color-ink-3);
+}
+
+.tagExternal {
+  color: var(--color-accent);
+}
+
+/* ====================================================================== */
+/* Prose — "Last time" and "Unresolved" (PRD §8)                          */
+/* ====================================================================== */
+
+.prose {
+  max-width: 62ch;
+  font-family: var(--font-serif, ui-serif, Georgia, serif);
+  font-size: var(--text-base);
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+.prose + .prose {
+  margin-top: var(--space-2);
+}
+
+/* `↗ Meeting notes, 28 Aug` — understated enough to ignore, present enough to check. */
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--space-2);
+  gap: var(--space-2);
+}
+
+.source {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.05em;
+}
+
+a.source:hover {
+  text-decoration: underline;
+}
+
+.sourceMore {
+  cursor: pointer;
+}
+
+/* A hedged guess, visibly hedged (PRD §8). */
+.inferred {
+  color: var(--color-risk);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ====================================================================== */
+/* The one action — bottom of the panel, always the same place            */
+/* ====================================================================== */
+
+.footer {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-rule);
+}
+
+.action {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+}
+
+.action:hover {
+  background: var(--color-accent-soft);
+}
+
+.action:disabled {
+  border-color: var(--color-rule);
+  color: var(--color-ink-3);
+  cursor: default;
+}
+
+/* ====================================================================== */
+/* Mobile — a sheet from the bottom, with the dashboard visible above     */
+/* ====================================================================== */
+
+@media (max-width: 767px) {
+  .panel {
+    top: auto;
+    left: 0;
+    width: 100%;
+    /* The strip of dashboard above the sheet is the point: you can still see where you were. */
+    height: calc(100% - 88px);
+    border-top: 1px solid var(--color-rule);
+    border-left: 0;
+    animation-name: rise;
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .row {
+    min-height: 44px;
+  }
+}
+
+/* The drag handle: the affordance for the fourth dismissal, swipe down. */
+.handle {
+  display: none;
+  padding: var(--space-2) 0 0;
+  touch-action: none;
+}
+
+.handleBar {
+  width: 36px;
+  height: 3px;
+  margin: 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-rule);
+}
+
+@media (max-width: 767px) {
+  .handle {
+    display: block;
+  }
+}
+
+/* ====================================================================== */
+/* Reduced motion — every one of the above collapses to a 120ms fade      */
+/* ====================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .panelClosing,
+  .backdrop,
+  .backdropClosing,
+  .arrive {
+    animation-duration: 120ms;
+    animation-name: fade;
+    animation-timing-function: linear;
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/*
+ * The "when the AI is wrong" controls (PRD §9).
+ *
+ * Quiet by design: present enough to use, recessive enough to ignore while reading.
+ * Revealed on hover or keyboard focus — never competing with the prose it sits above.
+ */
+.correct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.block:hover .correct,
+.block:focus-within .correct {
+  opacity: 1;
+}
+
+/* Touch has no hover, so the controls are simply always visible there. */
+@media (hover: none) {
+  .correct {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .correct {
+    transition: none;
+  }
+}

@@ -1,0 +1,907 @@
+/**
+ * Zone styling for the landing view (PRD §4–§7, §9, §10).
+ *
+ * Every value here is a token from app/globals.css. The hard rules from §10 hold
+ * throughout and are worth restating, because they are what keeps the page calm:
+ *
+ *   - NO box-shadow, anywhere. Separation is a 1px rule or a 2px left stripe.
+ *   - Radius 0 on structural surfaces, 2px (`--radius-sm`) on interactive ones.
+ *   - The 2px left stripe (the global `.stripe` class) is used in exactly three
+ *     places: the attention strip, the current meeting, and nothing else here.
+ *   - Times, counts, percentages and durations carry `tabular-nums` — either via
+ *     the global `.num` utility or the local `.tabular` rule below.
+ *   - Rows that are list or timeline rows also carry the global `.list-row` /
+ *     `.timeline-row` classes, which supply the 44px minimum target below 768px.
+ */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ====================================================================== */
+/* Zone 0 — Bar (PRD §9)                                                  */
+/* ====================================================================== */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 40px;
+  border-radius: 0;
+}
+
+.barIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.wordmark {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* The hairline between wordmark and date. Structural, so no radius. */
+.barSeparator {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 14px;
+  background: var(--color-rule);
+}
+
+.barDate {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `↻ Synced 2m ago` — mono 11px, and it is a button (PRD §9). */
+.syncButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.syncButton:hover {
+  background: var(--color-sunken);
+  color: var(--color-ink-2);
+}
+
+/* Stale beyond 15 minutes: the marker shifts hue and nothing else changes. */
+.syncButton[data-stale='true'] {
+  color: var(--color-risk);
+}
+
+.syncGlyph {
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+/* ====================================================================== */
+/* Zone 1 — Attention (PRD §9)                                            */
+/* ====================================================================== */
+
+.attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.attentionItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-raised);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+}
+
+.attentionLabel {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-critical);
+}
+
+.attentionText {
+  flex: 1 1 220px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+/* "and 2 more" — a named phrase, never a bare count. */
+.attentionMore {
+  padding-left: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* ====================================================================== */
+/* Zone 2 — Sentence (PRD §4, §10)                                        */
+/* ====================================================================== */
+
+.sentence {
+  max-width: 62ch;
+  font-family: var(--font-serif, ui-serif, Georgia, serif);
+  font-weight: 300;
+  font-size: var(--text-2xl);
+  line-height: 38px;
+  color: var(--color-ink);
+}
+
+/*
+ * Entities: ink-coloured text with a 40%-opacity accent underline. Visible as
+ * interactive, never a field of blue (PRD §4).
+ */
+.entity {
+  color: var(--color-ink);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  transition: border-color 120ms ease;
+}
+
+.entity:hover {
+  border-bottom-color: var(--color-accent);
+}
+
+/* The time-range entity scrolls the timeline; it is a button, not a link. */
+.entityButton {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.entityButton:hover {
+  border-bottom-color: var(--color-accent);
+}
+
+/*
+ * Board mode caps the sentence at TWO LINES (PRD §17.13).
+ *
+ * Keyed off the shell's `data-display` attribute rather than a prop, because the cap is
+ * a presentation decision and the component's only job is to notice — by measuring
+ * itself — whether anything was actually cut, and to offer "more" if so. `data-clamp`
+ * is the component's half of the contract: it goes false once the reader has expanded.
+ */
+:global([data-display='board']) .sentence[data-clamp='true'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* One word, lower case, no chevron and no count. It is an affordance, not a control. */
+.sentenceMore {
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.sentenceMore:hover {
+  color: var(--color-ink-2);
+  border-bottom-color: var(--color-accent);
+}
+
+/*
+ * Arrival skeleton: the container is already the right size, so resolving is a
+ * cross-fade and never a layout jump (PRD §11). It does not shimmer or pulse.
+ */
+.sentenceSkeleton {
+  display: flex;
+  max-width: 62ch;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonLine {
+  height: 20px;
+  background: var(--color-sunken);
+}
+
+.skeletonLine:last-child {
+  width: 58%;
+}
+
+@media (max-width: 767px) {
+  .sentence,
+  .sentenceSkeleton {
+    font-size: var(--text-xl);
+    line-height: 30px;
+  }
+}
+
+/* ====================================================================== */
+/* Source down — one inline line per affected zone (PRD §9)               */
+/* ====================================================================== */
+
+/*
+ * "Linear unreachable · showing data from 08:12 · Retry".
+ *
+ * One line, sitting above content that keeps rendering. It uses the global `.stripe`
+ * — the third and last of §10's three sanctioned uses of the 2px left stripe — and
+ * adds nothing else: no panel, no icon, no colour on the text itself. The zone is
+ * degraded, not broken, and it should read that way.
+ */
+.unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-critical-soft);
+}
+
+.unavailableText {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.unavailableRetry {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.unavailableRetry:hover {
+  border-bottom-color: var(--color-accent);
+}
+
+/* ====================================================================== */
+/* Zone 3a — Timeline (PRD §5, §17.9)                                     */
+/* ====================================================================== */
+
+.timelineZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* All-day events live in a band ABOVE the timeline, never as rows (PRD §17.9). */
+.allDayBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-sunken);
+}
+
+.allDayItem {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.zoneHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.zoneLabel {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline {
+  position: relative;
+  max-height: 60vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/*
+ * Board mode must fit 1440x720 without scrolling the *page* (PRD §17.13). The timeline
+ * already owns a scroll container of its own — §5 auto-scrolls it to "now" — so it is
+ * the zone that absorbs whatever height the rest of the board leaves, rather than
+ * carrying a fixed cap that is too tall on a busy day and wastes the monitor on a
+ * quiet one. It never pushes the week off the bottom of the screen.
+ */
+.timeline[data-mode='board'] {
+  flex: 1 1 auto;
+  min-height: 72px;
+  max-height: none;
+}
+
+/*
+ * A quiet day does not get stretched to look busy. The single line of free time takes
+ * the height of a single line and the top five moves up under it (PRD §9) — the empty
+ * space that follows is the honest shape of the day, not a container to be filled.
+ */
+.timeline[data-mode='board'][data-quiet='true'] {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/*
+ * `flex-basis: 0` rather than `auto` on purpose: the top five is the direct answer to
+ * "what do I work on today" and must never be the zone that gets squeezed, so it keeps
+ * its natural height and the timeline takes what is left over. A busy calendar
+ * therefore scrolls inside its own container instead of pushing the answer off screen.
+ */
+:global([data-display='board']) .timelineZone {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Nothing on the calendar: the zone takes one line and the top five moves up (§9). */
+:global([data-display='board']) .timelineZone[data-quiet='true'] {
+  flex: 0 0 auto;
+}
+
+/*
+ * One lane structure for all three row kinds: a fixed 42px lane on the left, then a
+ * `flex: 1; min-width: 0` column. Event titles, gap labels and the now label therefore
+ * all start at the same x, and the time column traces a straight vertical line down
+ * the whole timeline. The lane never shrinks, so a long title can never ride up over
+ * a time.
+ */
+.eventRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-rule-soft);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+}
+
+/* The empty lane that keeps gap and now rows aligned with the event titles. */
+.rowLane {
+  flex: 0 0 42px;
+  width: 42px;
+}
+
+/* The current meeting is the elevated one: raised surface + the 2px stripe. */
+.eventRow[data-now='true'] {
+  background: var(--color-raised);
+  padding-left: var(--space-2);
+}
+
+/* Past events dim to ink-3 and lose their subtitle. They stay visible. */
+.eventRow[data-past='true'] {
+  color: var(--color-ink-3);
+}
+
+/*
+ * The lane carries the START time only. Duration is already drawn to scale by the row
+ * height — that is the entire point of a proportional timeline — so repeating the end
+ * time would spend half the lane restating the shape of the block. The full range is
+ * on the row's accessible name.
+ */
+.eventTime {
+  flex: 0 0 42px;
+  width: 42px;
+  padding-top: 1px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.eventBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.eventTitle {
+  display: block;
+  font-weight: 500;
+  font-size: var(--text-base);
+  line-height: 1.2;
+}
+
+.eventSubtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* `18 MIN LEFT`. It never pulses, flashes or beeps. */
+.countdown {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-top: 1px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.countdown[data-urgent='true'] {
+  color: var(--color-critical);
+}
+
+/* Empty time is not to scale: one labelled band with dashed rules. */
+.gapRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-2);
+}
+
+.gapRule {
+  flex: 1 1 auto;
+  border-top: 1px dashed var(--color-rule);
+}
+
+.gapLabel {
+  flex: 0 0 auto;
+  padding-right: var(--space-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Now: a 1px rule in the critical hue, labelled.
+ *
+ * The one element in the product that moves on its own. The component feeds it a
+ * sub-minute `translateY` from the ticking clock; this transition is what turns each
+ * tick into a glide rather than a jump (PRD §11). Transform only — nothing here
+ * animates layout, and it does not pulse, breathe or loop.
+ */
+.nowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-2);
+  color: var(--color-critical);
+  will-change: transform;
+  transition: transform 1000ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nowRow {
+    transition: none;
+  }
+}
+
+.nowLine {
+  flex: 1 1 auto;
+  border-top: 1px solid var(--color-critical);
+}
+
+.nowLabel {
+  flex: 0 0 auto;
+  padding-right: var(--space-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--color-critical);
+  font-variant-numeric: tabular-nums;
+}
+
+.nowButton {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-2);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.nowButton:hover {
+  background: var(--color-sunken);
+  color: var(--color-ink);
+}
+
+.timelineEmpty {
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* ====================================================================== */
+/* Zone 3b — Top five (PRD §6)                                            */
+/* ====================================================================== */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+/*
+ * Board mode: TOP THREE per block, the remainder carried by the named count in the
+ * header (PRD §17.13). This is the one place §17.5's "show everything" does not apply,
+ * and it applies to the default view only.
+ *
+ * The cap is expressed twice on purpose and the two agree by construction. Every zone
+ * that is handed `mode` slices its own list — that is the version the unit tests
+ * exercise and the version that keeps the count in the header honest. This rule is the
+ * floor underneath it: the 720px constraint is absolute, so a list that reaches the
+ * board without a mode must still be capped rather than silently overflow the monitor.
+ */
+:global([data-display='board']) .list > *:nth-child(n + 4) {
+  display: none;
+}
+
+/*
+ * Board density. §10's 4px base is unchanged; board mode simply sits one step down the
+ * same scale, exactly as the type scale does. Row separation is still a hairline and
+ * the lanes still line up — this buys back the height the 17px type costs, so the
+ * rescale is self-funding rather than something the 720px budget has to absorb.
+ */
+:global([data-display='board']) .taskRow,
+:global([data-display='board']) .dueRow,
+:global([data-display='board']) .planningRow {
+  padding-block: var(--space-1);
+}
+
+:global([data-display='board']) .week {
+  gap: var(--space-4);
+}
+
+.taskRow {
+  padding: var(--space-2) 0;
+}
+
+.taskRow + .taskRow {
+  border-top: 1px solid var(--color-rule-soft);
+}
+
+/*
+ * Fixed-width lanes so titles align down the column: 16px rank, 6px dot,
+ * 58px issue key, then the title (PRD §6).
+ */
+.taskMain {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+}
+
+.rank {
+  flex: 0 0 16px;
+  width: 16px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/*
+ * The dot: shape carries state. In the top five the colour stays ink-3, because
+ * the reason line already carries urgency in words (PRD §6).
+ */
+.dot {
+  display: block;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  align-self: center;
+  border-radius: var(--radius-full);
+  background: var(--color-ink-3);
+}
+
+.dot[data-filled='false'] {
+  background: transparent;
+  border: 1px solid var(--color-ink-3);
+}
+
+.issueKey {
+  flex: 0 0 58px;
+  width: 58px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taskTitle {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+  font-size: var(--text-base);
+  line-height: 1.2;
+}
+
+/* The reason line is not optional. It is the entire basis of trust (PRD §6). */
+.reason {
+  padding-left: 104px;
+  font-size: var(--text-sm);
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--color-ink-2);
+}
+
+.taskMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-left: 104px;
+}
+
+.sourceRef {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--color-accent);
+}
+
+.inferred {
+  font-size: var(--text-2xs);
+  font-style: italic;
+  color: var(--color-ink-3);
+}
+
+.empty {
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+@media (max-width: 767px) {
+  .reason,
+  .taskMeta {
+    padding-left: 30px;
+  }
+}
+
+/* ====================================================================== */
+/* Zone 4 — Week (PRD §7)                                                 */
+/* ====================================================================== */
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.laneLabel {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--color-ink-3);
+}
+
+.lane[data-today='true'] .laneLabel {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+/* One bar, split booked / free. Structural, so no radius. */
+.laneTrack {
+  display: block;
+  height: 6px;
+  background: var(--color-rule);
+}
+
+.laneBooked {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+/* A heavy day is the only colour in the zone. */
+.laneBooked[data-heavy='true'] {
+  background: var(--color-risk);
+}
+
+.blockCount {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.dueRow,
+.planningRow {
+  padding: var(--space-2) 0;
+}
+
+.dueRow + .dueRow,
+.planningRow + .planningRow {
+  border-top: 1px solid var(--color-rule-soft);
+}
+
+.dueMain,
+.planningMain {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+}
+
+.rowTitle {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Colour carries urgency here, because there is no reason line beside it. */
+.dot[data-urgency='risk'] {
+  background: var(--color-risk);
+  border-color: var(--color-risk);
+}
+
+.dot[data-urgency='critical'] {
+  background: var(--color-critical);
+  border-color: var(--color-critical);
+}
+
+.dot[data-filled='false'][data-urgency='risk'],
+.dot[data-filled='false'][data-urgency='critical'] {
+  background: transparent;
+}
+
+.dueWhen {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dueWhen[data-urgency='risk'] {
+  color: var(--color-risk);
+}
+
+.dueWhen[data-urgency='critical'] {
+  color: var(--color-critical);
+}
+
+/* The `*NEW` marker sits in its own fixed 30px trailing lane. */
+.newMarker {
+  flex: 0 0 30px;
+  width: 30px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  color: var(--color-ink-3);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rowSource {
+  padding-left: 80px;
+}
+
+@media (max-width: 767px) {
+  .rowSource {
+    padding-left: 14px;
+  }
+}
+
+/* ====================================================================== */
+/* Switcher (PRD §3, §17.4)                                               */
+/* ====================================================================== */
+
+/*
+ * Two segments only — Month is cut from v1 (PRD §17.4). Visible only below
+ * 1000px; on desktop the switcher dissolves and all horizons are on screen.
+ */
+.switcher {
+  display: none;
+}
+
+@media (max-width: 999px) {
+  .switcher {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 2px;
+    background: var(--color-sunken);
+  }
+}
+
+.segment {
+  min-height: 44px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.segment[aria-selected='true'] {
+  background: var(--color-raised);
+  color: var(--color-ink);
+}

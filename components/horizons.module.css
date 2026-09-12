@@ -1,0 +1,48 @@
+/*
+ * Horizon layout (PRD §3).
+ *
+ * One layout, two sizes — only the column count changes. Month is cut from v1
+ * (PRD §17.4), so Today and Week sit side by side above 1000px, weighted so Today
+ * earns the extra width: it carries two sub-columns of its own.
+ */
+
+.horizons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.horizonToday,
+.horizonWeek {
+  min-width: 0; /* let long titles wrap instead of forcing a horizontal scroll */
+}
+
+/* Below 1000px the switcher is the only navigation, so exactly one horizon shows. */
+@media (max-width: 999px) {
+  .horizons[data-horizon='today'] .horizonWeek,
+  .horizons[data-horizon='week'] .horizonToday {
+    display: none;
+  }
+}
+
+@media (min-width: 1000px) {
+  .horizons {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-12);
+  }
+  .horizonToday {
+    flex: 1.2 1 0;
+  }
+  .horizonWeek {
+    flex: 0.9 1 0;
+    /* A hairline separates zones, never a card or a shadow (PRD §10). */
+    border-left: 1px solid var(--color-rule-soft);
+    padding-left: var(--space-8);
+  }
+  /* Both horizons are always visible on desktop regardless of switcher state. */
+  .horizons .horizonToday,
+  .horizons .horizonWeek {
+    display: block;
+  }
+}
