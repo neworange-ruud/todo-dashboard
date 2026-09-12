@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import DrillPanel, { parseTrail, serialiseTrail, type DrillFetcher } from './DrillPanel'
 import { BLOCK_ORDER, BLOCK_TITLES, type DrillBlockId } from '@/lib/drill/meeting'
+import { ISSUE_BLOCK_ORDER, MEETING_BLOCK_ORDER } from '@/lib/drill/blocks'
 import { TID } from '@/lib/testids'
 import type { DrillBlock } from '@/lib/types'
 
@@ -27,7 +28,7 @@ function harness() {
   const calls: DrillBlockId[] = []
   const deferreds = {} as Record<DrillBlockId, Deferred>
 
-  for (const id of BLOCK_ORDER) {
+  for (const id of [...MEETING_BLOCK_ORDER, ...ISSUE_BLOCK_ORDER]) {
     let resolve!: (value: unknown) => void
     const promise = new Promise((r) => {
       resolve = r
@@ -249,7 +250,9 @@ describe('DrillPanel', () => {
     // One panel, always — the hop pushes onto the trail inside it.
     expect(screen.getAllByTestId(TID.panel)).toHaveLength(1)
     expect(screen.getAllByTestId(TID.panelCrumb).length).toBeGreaterThan(1)
-    expect(blockIds()).toEqual([...BLOCK_ORDER])
+    // And it is now an ISSUE panel, so it lays out the issue's five rather than the
+    // meeting's — same discipline, different vocabulary (PRD §8).
+    expect(blockIds()).toEqual([...ISSUE_BLOCK_ORDER])
   })
 })
 

@@ -1,3 +1,7 @@
+// `lib/drill/blocks.ts` imports nothing, so this dependency cannot cycle. The block
+// vocabulary lives there because both the server builders and the client panel read it.
+import type { DrillBlockId } from './drill/blocks'
+
 /**
  * Shared domain types for Task Desk.
  *
@@ -58,6 +62,8 @@ export interface LinearIssue {
   /** e.g. "RW-214" */
   identifier: string
   title: string
+  /** Markdown body. Carries the `Provenance:` line on machine-extracted issues (§17.6). */
+  description: string | null
   /** ISO date (YYYY-MM-DD) or null. */
   dueDate: string | null
   /** Linear priority: 0 = none. Weak tiebreaker only — 21 of 22 are unset (PRD §16.3). */
@@ -104,18 +110,44 @@ export type RankSignal =
 // Timeline layout (PRD §5)
 // ---------------------------------------------------------------------------
 
+/**
+ * What an empty band means. Rendered as the band's label and exposed as `data-tone`.
+ *
+ * `clear` is time deliberately kept free of meetings (the *Vrij houden* block); `offwork`
+ * is outside working hours. Both are ordinary free time as far as layout is concerned —
+ * the distinction is what the band is allowed to say (PRD §17.9, round 4).
+ */
+export type GapTone = 'free' | 'clear' | 'offwork'
+
 export type TimelineRow =
-  | { kind: 'event'; event: CalendarEvent; heightPx: number; isPast: boolean; isNow: boolean }
-  | { kind: 'gap'; startMinutes: number; endMinutes: number; label: string; heightPx: number }
+  | {
+      kind: 'event'
+      event: CalendarEvent
+      heightPx: number
+      isPast: boolean
+      isNow: boolean
+      /** True when this meeting sits inside a non-work block — real, but out of hours. */
+      outsideHours?: boolean
+    }
+  | {
+      kind: 'gap'
+      startMinutes: number
+      endMinutes: number
+      label: string
+      heightPx: number
+      tone: GapTone
+    }
   | { kind: 'now'; atMinutes: number; label: string }
 
 export interface TimelineLayout {
   /** All-day events render as a header band above the timeline, never inside it. */
   allDay: CalendarEvent[]
   rows: TimelineRow[]
-  /** Total minutes of booked time, excluding all-day events. */
+  /** Total minutes of booked time, excluding all-day events and framing blocks. */
   bookedMinutes: number
   freeMinutes: number
+  /** The nominal workday less any non-work block — what load should be measured against. */
+  availableMinutes: number
 }
 
 // ---------------------------------------------------------------------------
@@ -148,9 +180,25 @@ export interface OmniDocument {
   id: string
   title: string
   url: string | null
+  /**
+   * The best text Omni gave for this document.
+   *
+   * From a search hit that is the joined `highlights` — query-driven excerpts, which for a
+   * Fireflies transcript routinely include the summary and the action-item list. From
+   * {@link fetchDocument} it is the whole body.
+   */
   snippet: string
   sourceType: string
   date: string | null
+  /** Omni's own content classification, e.g. `meeting_transcript`, `email`, `event`. */
+  contentType?: string
+  /** Everyone Omni recorded on the document — transcript speakers, mail recipients. */
+  participants?: string[]
+  /**
+   * The Graph event id, for a calendar document. Omni carries it verbatim, which is what
+   * makes a task's related meetings openable as real meeting drill-ins rather than as text.
+   */
+  eventId?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +208,8 @@ export interface OmniDocument {
 export type BlockStatus = 'pending' | 'loading' | 'ok' | 'empty' | 'failed'
 
 export interface DrillBlock<T> {
-  id: 'attendees' | 'last-time' | 'action-items' | 'account' | 'unresolved'
+  /** See `lib/drill/blocks.ts`: a meeting block id or an issue block id. */
+  id: DrillBlockId
   title: string
   status: BlockStatus
   /** Milliseconds, shown in the header once resolved. */

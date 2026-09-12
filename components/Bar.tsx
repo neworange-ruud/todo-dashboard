@@ -2,10 +2,18 @@ import { STALE_AFTER_MS } from '@/lib/config'
 import { TID, testid } from '@/lib/testids'
 import { formatRelative } from '@/lib/time'
 import type { SyncState } from '@/lib/types'
+import ThemeToggle from './ThemeToggle'
 import styles from './zones.module.css'
 
+export interface BarNav {
+  /** Addresses for the day before, the day after, and the live day. */
+  previous: string
+  next: string
+  today: string
+}
+
 export interface BarProps {
-  /** Pre-formatted date for today, e.g. "Friday 11 September". */
+  /** Pre-formatted date for the day being shown, e.g. "Friday 11 September". */
   dateLabel: string
   sync: SyncState
   /**
@@ -13,6 +21,10 @@ export interface BarProps {
    * without it the marker is still a real button, it just has nothing to do yet.
    */
   onRefresh?: () => void
+  /** False when a date override is showing another day (PRD §17.14). */
+  isToday?: boolean
+  /** Date navigation. Absent in contexts that have no router, such as a unit test. */
+  nav?: BarNav
 }
 
 /**
@@ -42,32 +54,87 @@ function readSync(lastSyncedAt: string | null): { marker: string; isStale: boole
   }
 }
 
-export default function Bar({ dateLabel, sync, onRefresh }: BarProps) {
+export default function Bar({
+  dateLabel,
+  sync,
+  onRefresh,
+  isToday = true,
+  nav,
+}: BarProps) {
   const { marker, isStale } = readSync(sync.lastSyncedAt)
 
   return (
-    <header className={styles.bar} {...testid(TID.bar)}>
+    <header
+      className={styles.bar}
+      data-preview={isToday ? 'false' : 'true'}
+      {...testid(TID.bar)}
+    >
       <div className={styles.barIdentity}>
         <span className={styles.wordmark}>TASK DESK</span>
         <span className={styles.barSeparator} aria-hidden="true" />
-        <span className={`${styles.barDate} num`}>{dateLabel}</span>
+
+        {nav && (
+          <a
+            className={styles.dateStep}
+            href={nav.previous}
+            aria-label="Previous day"
+            {...testid(TID.datePrev)}
+          >
+            ‹
+          </a>
+        )}
+
+        <span className={`${styles.barDate} num`} {...testid(TID.dateLabel)}>
+          {dateLabel}
+        </span>
+
+        {nav && (
+          <a
+            className={styles.dateStep}
+            href={nav.next}
+            aria-label="Next day"
+            {...testid(TID.dateNext)}
+          >
+            ›
+          </a>
+        )}
+
+        {/*
+          Not today, and saying so. A preview that looked identical to the live day is the
+          one failure mode this feature can produce, and PRD §9 is unambiguous about the
+          product never lying about its own state — so the marker is a word, in the warning
+          hue, next to the date it qualifies, and it doubles as the way back.
+        */}
+        {!isToday && (
+          <a
+            className={styles.previewMark}
+            href={nav?.today ?? '/'}
+            {...testid(TID.previewMark)}
+          >
+            PREVIEW · BACK TO TODAY
+          </a>
+        )}
       </div>
 
-      <button
-        type="button"
-        className={styles.syncButton}
-        data-stale={isStale ? 'true' : 'false'}
-        onClick={onRefresh}
-        aria-label={`${marker}. Refresh now.`}
-        {...testid(TID.refreshButton)}
-      >
-        <span className={styles.syncGlyph} aria-hidden="true">
-          ↻
-        </span>
-        <span className="num" {...testid(TID.syncMarker)}>
-          {marker}
-        </span>
-      </button>
+      <div className={styles.barControls}>
+        <ThemeToggle />
+
+        <button
+          type="button"
+          className={styles.syncButton}
+          data-stale={isStale ? 'true' : 'false'}
+          onClick={onRefresh}
+          aria-label={`${marker}. Refresh now.`}
+          {...testid(TID.refreshButton)}
+        >
+          <span className={styles.syncGlyph} aria-hidden="true">
+            ↻
+          </span>
+          <span className="num" {...testid(TID.syncMarker)}>
+            {marker}
+          </span>
+        </button>
+      </div>
     </header>
   )
 }

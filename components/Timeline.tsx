@@ -2,10 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TID, testid } from '@/lib/testids'
+import { drillHref, type ViewParams } from '@/lib/view-href'
 import type { CalendarEvent, DisplayMode, TimelineLayout, TimelineRow } from '@/lib/types'
 import styles from './zones.module.css'
 
 export interface TimelineProps {
+  /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
+  view?: ViewParams
+  /**
+   * The zone's own label. Defaults to TODAY, which is what it nearly always is.
+   *
+   * A preview of another day passes that day's name instead: a column headed TODAY while
+   * drawing next Wednesday is precisely the quiet lie PRD §9 rules out, and it is the kind
+   * that survives a second glance.
+   */
+  heading?: string
+  /** False on a preview — there is no "now" on a day that is not today. */
+  isToday?: boolean
+
   layout: TimelineLayout
   /** Server-rendered "now". Held as state and ticked on the client so it stays honest. */
   now: Date
@@ -114,7 +128,15 @@ function UnavailableLine({ source, since }: { source: string; since?: string }) 
  * each tick glides it rather than jumping it (§11). The countdown beside it re-renders
  * without animating, and nothing else here transitions at all.
  */
-export default function Timeline({ layout, now, mode, unavailable }: TimelineProps) {
+export default function Timeline({
+  layout,
+  now,
+  mode,
+  unavailable,
+  view,
+  heading = 'TODAY',
+  isToday = true,
+}: TimelineProps) {
   const nowMs = now.getTime()
   const [clockMs, setClockMs] = useState(nowMs)
   const [following, setFollowing] = useState(true)
@@ -203,16 +225,19 @@ export default function Timeline({ layout, now, mode, unavailable }: TimelinePro
       )}
 
       <div className={styles.zoneHead}>
-        <span className={styles.zoneLabel}>TODAY</span>
-        <button
-          type="button"
-          className={styles.nowButton}
-          onClick={returnToNow}
-          data-following={following ? 'true' : 'false'}
-          {...testid(TID.nowButton)}
-        >
-          Now
-        </button>
+        <span className={styles.zoneLabel}>{heading}</span>
+        {/* Nothing to return to on a day that is not today. */}
+        {isToday && (
+          <button
+            type="button"
+            className={styles.nowButton}
+            onClick={returnToNow}
+            data-following={following ? 'true' : 'false'}
+            {...testid(TID.nowButton)}
+          >
+            Now
+          </button>
+        )}
       </div>
 
       <div
@@ -255,6 +280,7 @@ export default function Timeline({ layout, now, mode, unavailable }: TimelinePro
                 key={`gap-${index}`}
                 className={styles.gapRow}
                 style={{ height: row.heightPx }}
+                data-tone={row.tone}
                 {...testid(TID.timelineGap)}
               >
                 <span className={styles.rowLane} aria-hidden="true" />
@@ -275,12 +301,17 @@ export default function Timeline({ layout, now, mode, unavailable }: TimelinePro
           return (
             <a
               key={event.id}
-              href={`?drill=meeting:${event.id}`}
+              href={drillHref('meeting', event.id, view)}
               className={`${styles.eventRow} timeline-row${row.isNow ? ' stripe' : ''} crossfade`}
               style={{ minHeight: row.heightPx }}
               data-past={row.isPast ? 'true' : 'false'}
               data-now={row.isNow ? 'true' : 'false'}
-              aria-label={`${range} ${event.subject}`}
+              data-outside={row.outsideHours ? 'true' : 'false'}
+              aria-label={
+                row.outsideHours
+                  ? `${range} ${event.subject}, outside working hours`
+                  : `${range} ${event.subject}`
+              }
               title={`${range} ${event.subject}`}
               {...testid(TID.timelineEvent)}
             >
@@ -290,6 +321,10 @@ export default function Timeline({ layout, now, mode, unavailable }: TimelinePro
                 <span className={styles.eventTitle}>{event.subject}</span>
                 {/* Past events lose their subtitle; they are context, not work. */}
                 {line && !row.isPast && <span className={styles.eventSubtitle}>{line}</span>}
+                {/* Real, and outside the hours the calendar says you work (PRD §17.9). */}
+                {row.outsideHours && !row.isPast && (
+                  <span className={styles.outsideMark}>Outside working hours</span>
+                )}
               </span>
               {row.isNow && (
                 <span

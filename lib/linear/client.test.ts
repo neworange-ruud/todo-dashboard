@@ -151,6 +151,7 @@ describe('mapping', () => {
     expect(issue).toEqual({
       identifier: 'RW-339',
       title: 'De Agentic Engineering-presentatie afmaken',
+      description: null,
       dueDate: '2026-07-22',
       priority: 2,
       state: 'In Progress',

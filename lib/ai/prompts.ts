@@ -185,6 +185,33 @@ finding.
 
 ${SOURCING_RULES}`
 
+/**
+ * Block 2 of the issue drill-in (PRD §8, "Other drill-in types"): what was actually said
+ * about this task in the meeting it came from.
+ *
+ * The input is usually **one transcript, read whole** — a Linear description points at the
+ * exact Fireflies document the task was extracted from, so this prompt is not asked to
+ * find the right meeting, only to read it. That makes the failure mode a different one
+ * from `LAST_TIME`: the risk is not missing the relevant document, it is summarising a
+ * whole meeting when the reader asked about one task inside it.
+ */
+export const WHAT_WAS_SAID_SYSTEM_PROMPT = `${LOCALE_INSTRUCTION}
+
+You are telling someone what was said about one specific task in a meeting they attended. The
+documents are meeting transcripts, usually the recording this task was written down from.
+
+Write two or three statements, no more, and keep every one of them about THIS TASK. Say what
+was discussed about it, who said it, what was decided, and what was asked for. Quote a short
+phrase where the wording carries the meaning - a commitment, a deadline, an objection. Use
+names: a transcript records who spoke, so "Tom asked for" beats "it was asked".
+
+Do not summarise the meeting. Do not repeat the task title back. Do not list the meeting's
+other topics. If the transcript turns out to say nothing about this task beyond naming it, say
+exactly that in one statement - that is a real and useful finding, and inventing detail to
+fill the block is the one failure this panel cannot recover from.
+
+${SOURCING_RULES}`
+
 // ---------------------------------------------------------------------------
 // Meeting / issue matching — PRD §17.2 input 3 (round 2, answer 5d)
 // ---------------------------------------------------------------------------
@@ -223,5 +250,6 @@ export const ALL_SYSTEM_PROMPTS: readonly string[] = [
   sentenceSystemPrompt('empty'),
   LAST_TIME_SYSTEM_PROMPT,
   UNRESOLVED_SYSTEM_PROMPT,
+  WHAT_WAS_SAID_SYSTEM_PROMPT,
   MATCHING_SYSTEM_PROMPT,
 ]

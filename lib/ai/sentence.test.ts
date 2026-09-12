@@ -46,6 +46,7 @@ function event(over: Partial<CalendarEvent> & { id: string }): CalendarEvent {
 function issue(over: Partial<LinearIssue> & { identifier: string }): LinearIssue {
   return {
     title: 'Acme migration',
+    description: null,
     dueDate: null,
     priority: 0,
     state: 'In Progress',
@@ -73,7 +74,7 @@ const MEETING_B = event({ id: 'evt-b', subject: 'Design review', start: at('11:0
 const EVENT_ROWS: TimelineRow[] = [
   { kind: 'event', event: MEETING_A, heightPx: 60, isPast: false, isNow: false },
   { kind: 'event', event: MEETING_B, heightPx: 60, isPast: false, isNow: false },
-  { kind: 'gap', startMinutes: 14 * 60, endMinutes: 16 * 60, label: '2H free', heightPx: 24 },
+  { kind: 'gap', startMinutes: 14 * 60, endMinutes: 16 * 60, label: '2H free', heightPx: 24, tone: 'free' },
 ]
 
 function model(over: Partial<DashboardModel> = {}): DashboardModel {
@@ -81,8 +82,9 @@ function model(over: Partial<DashboardModel> = {}): DashboardModel {
     todayKey: DAY,
     now: new Date(at('08:30')),
     display: 'default',
+    isToday: true,
     attention: [],
-    timeline: { allDay: [], rows: EVENT_ROWS, bookedMinutes: 120, freeMinutes: 360 },
+    timeline: { allDay: [], rows: EVENT_ROWS, bookedMinutes: 120, freeMinutes: 360, availableMinutes: 480 },
     ranked: [ranked({ identifier: 'RW-214' })],
     due: [],
     planning: [issue({ identifier: 'RW-900', state: 'Inbox', title: 'Follow up with Jasper' })],
@@ -224,7 +226,7 @@ describe('window selection', () => {
 
   it('uses the empty register when nothing is scheduled', () => {
     const quiet = model({
-      timeline: { allDay: [], rows: [], bookedMinutes: 0, freeMinutes: 480 },
+      timeline: { allDay: [], rows: [], bookedMinutes: 0, freeMinutes: 480, availableMinutes: 480 },
     })
     expect(isEmptyDay(quiet)).toBe(true)
     expect(windowFor(quiet)).toBe('empty')
@@ -255,7 +257,7 @@ describe('deterministicSentence', () => {
   })
 
   it('names the freedom on an empty day', () => {
-    const quiet = model({ timeline: { allDay: [], rows: [], bookedMinutes: 0, freeMinutes: 480 } })
+    const quiet = model({ timeline: { allDay: [], rows: [], bookedMinutes: 0, freeMinutes: 480, availableMinutes: 480 } })
     expect(deterministicSentence(quiet).text).toMatch(/^Nothing on the calendar today/)
   })
 

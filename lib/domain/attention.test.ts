@@ -7,7 +7,7 @@ const ev = (o: Partial<CalendarEvent> & { id: string; start: string; end: string
   organizer: null, attendees: [], webLink: null, ...o,
 })
 const iss = (o: Partial<LinearIssue> & { identifier: string }): LinearIssue => ({
-  title: o.identifier, dueDate: null, priority: 0, state: 'In Progress', labels: [],
+  title: o.identifier, description: null, dueDate: null, priority: 0, state: 'In Progress', labels: [],
   url: '', hasRelations: false, createdAt: '2026-01-01', updatedAt: '2026-01-01', ...o,
 })
 

@@ -15,6 +15,7 @@ function issue(partial: Partial<LinearIssue> & { identifier: string; state: Task
   return {
     title: 'Untitled',
     dueDate: null,
+    description: null,
     priority: 0,
     labels: [],
     url: `https://linear.app/rw/issue/${partial.identifier}`,
@@ -72,6 +73,7 @@ describe('rankTasks — due dates dominate', () => {
       identifier: 'RW-undated',
       state: 'Waiting',
       dueDate: null,
+      description: null,
       priority: 1,
     })
     const distantlyDated = issue({
@@ -145,6 +147,7 @@ describe('rankTasks — priority is a tiebreaker, not a driver', () => {
       identifier: 'RW-urgent',
       state: 'Planned',
       dueDate: '2026-09-14',
+      description: null,
       priority: 1,
     })
     const unset = issue({ identifier: 'RW-unset', state: 'Planned', dueDate: '2026-09-14' })
@@ -164,6 +167,7 @@ describe('rankTasks — priority is a tiebreaker, not a driver', () => {
       identifier: 'RW-urgent',
       state: 'Planned',
       dueDate: '2026-09-15',
+      description: null,
       priority: 1,
     })
     const dueSooner = issue({ identifier: 'RW-sooner', state: 'Planned', dueDate: '2026-09-14' })
@@ -271,6 +275,7 @@ describe('rankTasks — the reason line', () => {
       identifier: 'RW-1',
       state: 'In Progress',
       dueDate: TODAY,
+      description: null,
       priority: 1,
     })
     expect(rankTasks([started], ctx)[0].reason.text).toBe(

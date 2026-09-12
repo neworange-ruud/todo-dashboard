@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TID, testid } from '@/lib/testids'
+import { withView, type ViewParams } from '@/lib/view-href'
 import { fadeOut, hasSentenceChanged, runOpenCascade, writeInWords } from '@/lib/motion'
 import type { DailySentence, SentenceEntity } from '@/lib/types'
 import styles from './zones.module.css'
 
 export interface SentenceProps {
+  /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
+  view?: ViewParams
+
   sentence: DailySentence | null
   /**
    * Renders the resolving skeleton instead of prose — but **only before the first
@@ -121,7 +125,7 @@ function entityHref(entity: SentenceEntity): string {
  * the first sentence has arrived; from then on the last good prose stays on screen and
  * the new one cross-fades into its place.
  */
-export default function Sentence({ sentence, loading = false }: SentenceProps) {
+export default function Sentence({ sentence, loading = false, view }: SentenceProps) {
   // The sentence currently on screen. Seeded from props so the server and the first
   // client render agree, then held across a refresh that briefly has nothing to offer.
   const [shown, setShown] = useState<DailySentence | null>(sentence)
@@ -243,7 +247,7 @@ export default function Sentence({ sentence, loading = false }: SentenceProps) {
           return (
             <a
               key={index}
-              href={entityHref(entity)}
+              href={withView(entityHref(entity), view)}
               className={styles.entity}
               data-entity-kind={entity.kind}
               data-ref={entity.ref}

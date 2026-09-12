@@ -632,12 +632,21 @@
  * The dot: shape carries state. In the top five the colour stays ink-3, because
  * the reason line already carries urgency in words (PRD §6).
  */
+/*
+ * The state marker aligns with the issue key, not with the row.
+ *
+ * `align-self: center` is right for a one-line row and wrong for every other: a title that
+ * wraps to two lines pushed the dot into the gap between them, where it reads as belonging
+ * to neither. It is a marker *for the row's identity*, so it sits on the line the identity
+ * is on. The offset optically centres a 6px circle on the ~17px first line box.
+ */
 .dot {
   display: block;
   flex: 0 0 6px;
   width: 6px;
   height: 6px;
-  align-self: center;
+  align-self: flex-start;
+  margin-top: 6px;
   border-radius: var(--radius-full);
   background: var(--color-ink-3);
 }
@@ -904,4 +913,204 @@
 .segment[aria-selected='true'] {
   background: var(--color-raised);
   color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Date override — PRD §17.14
+   --------------------------------------------------------------------------- */
+
+/*
+ * Day steppers either side of the date. Quiet enough to disappear on the live day,
+ * which is the day they will nearly always be sitting on.
+ */
+.dateStep {
+  flex: 0 0 auto;
+  padding: 0 var(--space-1);
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.dateStep:hover,
+.dateStep:focus-visible {
+  color: var(--color-ink);
+}
+
+/*
+ * The one loud thing in the bar, and only when the bar is showing a day that is not
+ * today. A preview must never be mistakable for the live dashboard (PRD §9).
+ */
+.previewMark {
+  flex: 0 0 auto;
+  padding: 1px var(--space-2);
+  background: color-mix(in srgb, var(--color-risk) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-risk) 45%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--color-risk);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.previewMark:hover,
+.previewMark:focus-visible {
+  background: color-mix(in srgb, var(--color-risk) 22%, transparent);
+}
+
+/*
+ * Narrow screens: the bar runs out of room long before the content does.
+ *
+ * At 430px the wordmark, the steppers, a long date, the marker and the sync control do
+ * not fit on one 40px line, and the sync button ends up sitting on top of the marker —
+ * which on a real phone means the one control that gets you back to today cannot be
+ * tapped. PRD §3 makes mobile the primary target, so the bar gives up its decoration
+ * rather than its function: the wordmark goes first, then the date shortens, and the
+ * marker keeps its full size because it is the thing you need to hit.
+ */
+@media (max-width: 560px) {
+  .bar {
+    gap: var(--space-2);
+  }
+
+  .barIdentity {
+    flex: 1 1 auto;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .wordmark,
+  .barSeparator {
+    display: none;
+  }
+
+  .previewMark {
+    flex: 0 0 auto;
+    letter-spacing: 0;
+  }
+
+  /* The date is the one thing here that may be clipped; everything else is a control. */
+  .barDate {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .syncButton {
+    flex: 0 0 auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Day shape — PRD §17.9 round 4
+   --------------------------------------------------------------------------- */
+
+/*
+ * Time deliberately kept clear of meetings reads in the accent rather than the muted
+ * ink: it is a decision someone made, not an absence. Time outside working hours is
+ * quieter than ordinary free time, because it is not capacity at all.
+ */
+.gapRow[data-tone='clear'] .gapLabel {
+  color: var(--color-accent);
+}
+
+.gapRow[data-tone='clear'] .gapRule {
+  border-top-style: solid;
+  border-top-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.gapRow[data-tone='offwork'] .gapLabel {
+  color: var(--color-ink-3);
+  opacity: 0.7;
+}
+
+.gapRow[data-tone='offwork'] .gapRule {
+  border-top-style: dotted;
+}
+
+/*
+ * A real commitment that happens to sit outside working hours. Shown exactly as any
+ * other event — it is genuine — with its start time in the warning hue and one mono
+ * word in the subtitle line saying why it looks different.
+ */
+.eventRow[data-outside='true'] .eventTime {
+  color: var(--color-risk);
+}
+
+.outsideMark {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+/* A day with no working time left has no bar to draw — the empty track says it. */
+.lane[data-off='true'] .laneTrack {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-rule) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Theme control — PRD §10
+   --------------------------------------------------------------------------- */
+
+.barControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/*
+ * Same weight and the same mono 11px as the sync marker beside it: both are persistent
+ * settings, neither is content, and the bar must keep meaning one thing.
+ */
+.themeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.themeButton:hover,
+.themeButton:focus-visible {
+  background: var(--color-sunken);
+  color: var(--color-ink-2);
+}
+
+.themeGlyph {
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+/* An explicit choice is worth one shade more than following the system. */
+.themeButton[data-theme-choice='light'],
+.themeButton[data-theme-choice='dark'] {
+  color: var(--color-ink-2);
+}
+
+/* Narrow screens keep the glyph and drop the word — the bar is already tight. */
+@media (max-width: 560px) {
+  .themeButton span:not(.themeGlyph) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

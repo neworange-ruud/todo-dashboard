@@ -37,6 +37,7 @@ function issue(over: Partial<LinearIssue> & { identifier: string }): LinearIssue
   return {
     title: 'Acme migration cut-over',
     dueDate: null,
+    description: null,
     priority: 0,
     state: 'In Progress',
     labels: [],

@@ -12,7 +12,11 @@ import { EXCLUDED_STATE_NAMES } from '../types'
 /**
  * One page of open issues for the team.
  *
- * Only the fields the product actually renders are requested. There are no estimates,
+ * `description` is requested because it carries the machine-extraction provenance line
+ * (`lib/domain/provenance.ts`) — the exact pointer from a task to the transcript or mail
+ * it came from, and the input to the issue drill-in's *What was said* block.
+ *
+ * Otherwise only the fields the product actually renders are requested. There are no estimates,
  * projects or cycles on this board (PRD §16.3/§16.4), so none are asked for.
  * `relations`/`inverseRelations` are fetched purely to derive {@link LinearIssue.hasRelations}.
  */
@@ -25,6 +29,7 @@ export const ISSUES_QUERY = `query TaskDeskIssues($filter: IssueFilter!, $first:
     nodes {
       identifier
       title
+      description
       dueDate
       priority
       url
@@ -90,6 +95,7 @@ interface Connection<T> {
 export interface LinearIssueNode {
   identifier: string
   title: string | null
+  description?: string | null
   dueDate: string | null
   priority: number | null
   url: string | null

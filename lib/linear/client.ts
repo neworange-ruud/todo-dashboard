@@ -88,6 +88,7 @@ export function mapIssue(node: LinearIssueNode): LinearIssue | null {
   return {
     identifier: node.identifier,
     title: node.title ?? '',
+    description: node.description ?? null,
     dueDate: node.dueDate ? node.dueDate.slice(0, 10) : null,
     priority: node.priority ?? 0,
     state: stateName as TaskState,

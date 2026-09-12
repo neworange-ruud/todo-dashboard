@@ -1,5 +1,6 @@
 import type { AttentionItem, CalendarEvent, LinearIssue } from '../types'
 import { daysBetween, formatTime } from '../time'
+import { isContainer } from './shape'
 
 /**
  * The attention strip (PRD §9).
@@ -26,6 +27,15 @@ export interface AttentionContext {
   events: CalendarEvent[]
   todayKey: string
   now: Date
+  /**
+   * How far ahead of `now` a conflict still counts. Defaults to
+   * {@link CONFLICT_HORIZON_HOURS}.
+   *
+   * Widened to a whole day when the dashboard is previewing another date (PRD §17.14):
+   * there, `now` is that day's midnight and the question is no longer "what is about to
+   * go wrong" but "what already looks wrong about that day".
+   */
+  horizonHours?: number
 }
 
 function overlaps(a: CalendarEvent, b: CalendarEvent): boolean {
@@ -37,11 +47,20 @@ function overlaps(a: CalendarEvent, b: CalendarEvent): boolean {
  *
  * All-day events are excluded: a colleague's holiday overlapping your morning is not a
  * conflict, and on a real calendar it would fire every single day.
+ *
+ * Framing blocks are excluded for the same reason and more urgently. *Vrij houden* spans
+ * the whole Wednesday morning, so every meeting held in that morning overlapped it and the
+ * strip announced a double-booking for each one — a rule that fires every week is a rule
+ * the reader learns to skip, which is exactly what §9 warns this zone must never become.
  */
-export function findConflicts(events: CalendarEvent[], now: Date): Array<[CalendarEvent, CalendarEvent]> {
-  const horizon = now.getTime() + CONFLICT_HORIZON_HOURS * 3600_000
+export function findConflicts(
+  events: CalendarEvent[],
+  now: Date,
+  horizonHours: number = CONFLICT_HORIZON_HOURS,
+): Array<[CalendarEvent, CalendarEvent]> {
+  const horizon = now.getTime() + horizonHours * 3600_000
   const candidates = events
-    .filter((e) => !e.isAllDay && !e.isCancelled)
+    .filter((e) => !e.isAllDay && !e.isCancelled && !isContainer(e))
     .filter((e) => Date.parse(e.end) > now.getTime() && Date.parse(e.start) <= horizon)
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
 
@@ -74,7 +93,7 @@ export function findBadlyOverdue(issues: LinearIssue[], todayKey: string): Linea
 export function buildAttention(ctx: AttentionContext): AttentionItem[] {
   const items: AttentionItem[] = []
 
-  for (const [a, b] of findConflicts(ctx.events, ctx.now)) {
+  for (const [a, b] of findConflicts(ctx.events, ctx.now, ctx.horizonHours)) {
     items.push({
       text: `You are double-booked at ${formatTime(a.start)} — ${a.subject} and ${b.subject}.`,
       href: `?drill=meeting:${encodeURIComponent(a.id)}`,

@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 
 import {
-  BLOCK_ORDER,
   BLOCK_TITLES,
+  blockOrderFor,
   buildDrill,
+  isBlockOf,
   type DrillBlockId,
   type DrillPayload,
   type DrillType,
 } from '@/lib/drill/meeting'
+import { resolveViewDate } from '@/lib/time'
 
 /**
  * `GET /api/drill/{type}/{id}` — the drill-in's data (PRD §8).
@@ -33,10 +35,6 @@ function isDrillType(value: string): value is DrillType {
   return (TYPES as readonly string[]).includes(value)
 }
 
-function isBlockId(value: string): value is DrillBlockId {
-  return (BLOCK_ORDER as readonly string[]).includes(value)
-}
-
 export async function GET(
   request: Request,
   // Next.js 16: dynamic params arrive as a promise and must be awaited.
@@ -49,10 +47,18 @@ export async function GET(
     return NextResponse.json({ error: 'Unknown drill target.' }, { status: 404 })
   }
 
-  const requested = new URL(request.url).searchParams.getAll('block').filter(isBlockId)
+  const search = new URL(request.url).searchParams
+  // Blocks are validated against THIS type's vocabulary: a meeting has no `said` block and
+  // an issue has no `attendees` block, and a request for one is a 404's worth of nonsense
+  // rather than an empty container.
+  const requested = search.getAll('block').filter((b) => isBlockOf(rawType, b))
+
+  // The day the dashboard behind the panel is showing (PRD §17.14). Unreadable resolves to
+  // today, exactly as it does on the page.
+  const dateKey = resolveViewDate(search.get('date')).key
 
   try {
-    const payload = await buildDrill(rawType, id)
+    const payload = await buildDrill(rawType, id, { dateKey })
     return NextResponse.json(project(payload, requested), {
       headers: { 'Cache-Control': 'no-store' },
     })
@@ -81,7 +87,7 @@ function fallback(
   requested: DrillBlockId[],
   error: string,
 ): DrillPayload {
-  const ids = requested.length ? requested : [...BLOCK_ORDER]
+  const ids = requested.length ? requested : [...blockOrderFor(type)]
   return {
     type,
     id,

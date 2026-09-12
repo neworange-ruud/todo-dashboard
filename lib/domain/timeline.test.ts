@@ -264,7 +264,13 @@ describe('nowOnward (wall monitor)', () => {
 describe('degenerate days', () => {
   it('does not crash on an empty day', () => {
     const layout = buildTimeline([], now('10:00'))
-    expect(layout).toEqual({ allDay: [], rows: [], bookedMinutes: 0, freeMinutes: 0 })
+    expect(layout).toEqual({
+      allDay: [],
+      rows: [],
+      bookedMinutes: 0,
+      freeMinutes: 0,
+      availableMinutes: 480,
+    })
   })
 
   it('ignores cancelled events', () => {

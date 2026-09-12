@@ -21,8 +21,8 @@
 import { completeStructured, type CompleteStructuredRequest } from './client'
 import { sentenceRetryPrompt, sentenceSystemPrompt } from './prompts'
 import { getOrFetch } from '../cache'
-import { GRAPH_USER_PRINCIPAL_NAME, MODELS, TTL } from '../config'
-import { formatDuration, formatTime, sentenceWindow , isWeekend } from '../time'
+import { GRAPH_USER_PRINCIPAL_NAME, MODELS, TIMEZONE, TTL } from '../config'
+import { formatDuration, formatTime, sentenceWindow, isWeekend, startOfLocalDay } from '../time'
 import type { DashboardModel } from '../view-model'
 import type { DailySentence, EntityKind, SentenceEntity, TimelineRow } from '../types'
 
@@ -193,12 +193,23 @@ export function isEmptyDay(model: DashboardModel): boolean {
   return eventRows(model).length === 0 && model.timeline.allDay.length === 0
 }
 
-/** Which §4 register applies. */
+/**
+ * Which §4 register applies.
+ *
+ * Every question here is asked of the **day being shown**, not of the clock. On a preview
+ * of another date (PRD §17.14) the clock is still ticking through this afternoon, and a
+ * sentence that opened "the rest of the afternoon is open" while describing next Monday
+ * would be fluent, confident and about the wrong day.
+ */
 export function windowFor(model: DashboardModel): SentenceWindow {
+  const day = model.isToday ? model.now : startOfLocalDay(model.todayKey)
   // The weekend register wins over the clock: on a Saturday, "the afternoon is open"
   // is technically true and completely wrong (PRD §9, weekend / out of office).
-  if (isWeekend(model.now)) return 'weekend'
-  return isEmptyDay(model) ? 'empty' : sentenceWindow(model.now)
+  if (isWeekend(day)) return 'weekend'
+  if (isEmptyDay(model)) return 'empty'
+  // A day you are looking ahead to has no time of day yet. The morning register is the
+  // one that describes a day whole rather than from somewhere inside it.
+  return model.isToday ? sentenceWindow(model.now) : 'morning'
 }
 
 /** Issue identifiers the sentence must never point at (PRD §6, §4). */
@@ -220,7 +231,13 @@ export function describeModel(model: DashboardModel): string {
   const events = eventRows(model)
   const forbidden = new Set(inboxIdentifiers(model))
 
-  lines.push(`Today is ${model.todayKey}. The local time is ${formatTime(model.now)}.`)
+  // A preview is described as the day it is, with no clock at all — handing the model a
+  // live time alongside another date is the shortest route to a confidently wrong tense.
+  lines.push(
+    model.isToday
+      ? `Today is ${model.todayKey}. The local time is ${formatTime(model.now)}.`
+      : `This is a look ahead to ${model.todayKey}, which is not today. Describe that day as a whole; do not refer to the current time.`,
+  )
 
   if (events.length === 0 && model.timeline.allDay.length === 0) {
     lines.push('CALENDAR: nothing scheduled today.')
@@ -358,6 +375,19 @@ function numberWord(n: number): string {
   return NUMBER_WORDS[n] ?? String(n)
 }
 
+/**
+ * The word the sentence uses for the day it is describing.
+ *
+ * "today" on a preview of next Wednesday is fluent and wrong, and PRD §4's whole point is
+ * that this zone reads as written rather than generated — so it names the day instead.
+ */
+function dayWord(model: DashboardModel): string {
+  if (model.isToday) return 'today'
+  return new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, weekday: 'long' }).format(
+    startOfLocalDay(model.todayKey),
+  )
+}
+
 function partOfDay(startMinutes: number): string {
   if (startMinutes < 12 * 60) return 'this morning'
   if (startMinutes < 17 * 60) return 'this afternoon'
@@ -391,9 +421,10 @@ export function deterministicSentence(
   }
 
   if (window === 'empty') {
+    const day = dayWord(model)
     const head = model.week.some((d) => d.isHeavy && !d.isToday)
-      ? 'Nothing on the calendar today, and the rest of the week is where the load sits.'
-      : 'Nothing on the calendar today.'
+      ? `Nothing on the calendar ${day}, and the rest of the week is where the load sits.`
+      : `Nothing on the calendar ${day}.`
     return { text: head + tail, entities }
   }
 
@@ -409,7 +440,8 @@ export function deterministicSentence(
 
   const count = window === 'morning' ? events.length : remaining.length
   const noun = count === 1 ? 'meeting' : 'meetings'
-  const when = window === 'morning' ? 'today' : 'left today'
+  // "left today" only makes sense from inside the day; a preview gets the plain name.
+  const when = window === 'morning' ? dayWord(model) : `left ${dayWord(model)}`
   const block = longest
     ? `, and ${formatDuration(longest.endMinutes - longest.startMinutes)} clear ${partOfDay(longest.startMinutes)}`
     : ''

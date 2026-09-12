@@ -18,6 +18,15 @@ export const TID = {
   syncMarker: 'sync-marker',
   refreshButton: 'refresh-button',
 
+  // Date override (PRD §17.14)
+  dateLabel: 'date-label',
+  datePrev: 'date-prev',
+  dateNext: 'date-next',
+  previewMark: 'preview-mark',
+
+  /** Theme control (PRD §10). */
+  themeToggle: 'theme-toggle',
+
   // Sentence (PRD §4)
   sentenceText: 'sentence-text',
   sentenceEntity: 'sentence-entity',

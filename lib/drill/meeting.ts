@@ -1,13 +1,18 @@
 // Shared, client-safe vocabulary lives in ./blocks so the panel can import it
 // without pulling this server-only module into the browser bundle.
-export { BLOCK_ORDER, BLOCK_TITLES, BLOCK_SOURCE_LABELS } from './blocks'
+export { BLOCK_ORDER, BLOCK_TITLES, BLOCK_SOURCE_LABELS, blockOrderFor, isBlockOf } from './blocks'
 export type { DrillBlockId, DrillType } from './blocks'
-import { BLOCK_ORDER, BLOCK_TITLES, BLOCK_SOURCE_LABELS } from './blocks'
-import type { DrillBlockId, DrillType } from './blocks'
+import { BLOCK_ORDER, BLOCK_TITLES } from './blocks'
+import type { DrillType } from './blocks'
+import { runBlock, blockFailure, type BlockOutcome } from './run'
+import { buildIssueDrill, type IssueDrillDeps } from './issue'
+export { buildIssueDrill } from './issue'
+export type { IssueDrillDeps } from './issue'
+export { blockFailure, safeMessage } from './run'
 import 'server-only'
 
 import { GRAPH_USER_PRINCIPAL_NAME } from '../config'
-import { fetchEventsForDay, fetchEventsForWeek } from '../graph/calendar'
+import { fetchEventById, fetchEventsForDay, fetchEventsForWeek } from '../graph/calendar'
 import { fetchIssues } from '../linear/client'
 import { searchByAttendees } from '../omni/client'
 import type { OmniSearchResult } from '../omni/client'
@@ -15,7 +20,6 @@ import { accountStatus, type BrainAccountStatus, type BrainResult } from '../bra
 import { lastTime as lastTimeSynthesis, unresolved as unresolvedSynthesis } from '../ai/synthesis'
 import { toDateKey, weekdaysOf } from '../time'
 import type {
-  BlockStatus,
   CalendarEvent,
   DrillBlock,
   LinearIssue,
@@ -126,6 +130,8 @@ const SYNTHESISERS: Record<'lastTime' | 'unresolved', SynthesisFn> = {
 
 export interface MeetingDrillDeps {
   loadEvent?: (eventId: string) => Promise<CalendarEvent | null>
+  /** The day the dashboard behind the panel is showing (PRD §17.14). */
+  dateKey?: string
   loadIssues?: () => Promise<LinearIssue[]>
   loadOmniDocs?: (event: CalendarEvent) => Promise<OmniSearchResult>
   loadAccount?: (company: string) => Promise<BrainResult<BrainAccountStatus | null>>
@@ -135,84 +141,6 @@ export interface MeetingDrillDeps {
 }
 
 const INTERNAL_DOMAIN = GRAPH_USER_PRINCIPAL_NAME.split('@')[1]?.toLowerCase() ?? ''
-
-// ---------------------------------------------------------------------------
-// runBlock — the containment boundary
-// ---------------------------------------------------------------------------
-
-interface BlockOutcome<T> {
-  data?: T
-  sources?: SourceRef[]
-  /** Force the *Nothing found* reading even when `data` is present. */
-  empty?: boolean
-}
-
-class BlockFailure extends Error {}
-
-/** Raised inside a block body to render *Could not reach X · Retry* rather than a crash. */
-export function blockFailure(message: string): never {
-  throw new BlockFailure(message)
-}
-
-/**
- * Runs one block body under its own clock and its own catch.
- *
- * Never rejects. An empty payload becomes `'empty'` (*Nothing found*), a thrown error
- * becomes `'failed'` with a message safe to render — secrets are scrubbed by
- * {@link safeMessage} before they can reach a header.
- */
-async function runBlock<T>(
-  id: DrillBlockId,
-  fn: () => Promise<BlockOutcome<T>>,
-  now: () => number,
-): Promise<DrillBlock<T>> {
-  const started = now()
-  const base = { id, title: BLOCK_TITLES[id] } as const
-
-  try {
-    const outcome = await fn()
-    const empty = outcome.empty === true || isEmpty(outcome.data)
-    const status: BlockStatus = empty ? 'empty' : 'ok'
-    return {
-      ...base,
-      status,
-      elapsedMs: Math.max(0, now() - started),
-      ...(empty ? {} : { data: outcome.data }),
-      ...(outcome.sources?.length ? { sources: outcome.sources } : {}),
-    }
-  } catch (err) {
-    return {
-      ...base,
-      status: 'failed',
-      elapsedMs: Math.max(0, now() - started),
-      error: safeMessage(err, BLOCK_SOURCE_LABELS[id]),
-    }
-  }
-}
-
-function isEmpty(data: unknown): boolean {
-  if (data === null || data === undefined) return true
-  if (Array.isArray(data)) return data.length === 0
-  if (typeof data === 'string') return data.trim().length === 0
-  return false
-}
-
-/**
- * A message fit to print in a block header.
- *
- * Anything long, key-shaped or bearer-shaped is dropped in favour of the generic line —
- * a header is the last place an API key should be able to surface (PRD §12.5).
- */
-export function safeMessage(err: unknown, sourceLabel: string): string {
-  const fallback = `Could not reach ${sourceLabel}`
-  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
-  const text = raw.trim()
-  if (!text || text.length > 160) return fallback
-  if (/(bearer|api[-_ ]?key|authorization|token|secret|password)/i.test(text)) return fallback
-  // A long unbroken run of key-ish characters is a credential, whatever it is called.
-  if (/[A-Za-z0-9_-]{28,}/.test(text)) return fallback
-  return text
-}
 
 // ---------------------------------------------------------------------------
 // Block 1 — Attendees (Graph, instant)
@@ -253,6 +181,63 @@ export function externalCompanies(event: CalendarEvent): string[] {
     counts.set(company, (counts.get(company) ?? 0) + 1)
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name)
+}
+
+/**
+ * Words in a subject too ordinary to be a customer.
+ *
+ * Deliberately short: Brain's `search_companies` is itself selective — verified live,
+ * "Starterscheck", "Weekstart", "Bitwarden" and "ISO" all return nothing while "NVM" and
+ * "BOVAG" return the account — so this list only has to stop the obvious noise, not to
+ * second-guess the CRM.
+ */
+const SUBJECT_NOISE = new Set([
+  'meeting', 'call', 'sync', 'overleg', 'bespreking', 'weekstart', 'check', 'checkin',
+  'update', 'intro', 'kickoff', 'kick', 'review', 'demo', 'standup', 'sessie', 'session',
+  'offerte', 'voorstel', 'afspraak', 'bijpraten', 'vergadering', 'teams', 'online',
+  'met', 'van', 'der', 'het', 'een', 'voor', 'the', 'and', 'with',
+])
+
+/** How many names the block will ask Brain about before giving up. */
+const MAX_COMPANY_CANDIDATES = 4
+
+/**
+ * Company names worth asking Brain about, most confident first.
+ *
+ * **Attendee domains alone were not enough.** They are the strongest signal and they are
+ * absent from most of the calendar: a meeting called *NVM offerte* with only Ruud in the
+ * room yields no external domain, so the block reported *Nothing found* about an account
+ * that Brain knows perfectly well — three open opportunities and a sent invoice. The
+ * subject is the other half of the answer, and on this calendar it is usually the customer's
+ * name with a Dutch noun attached to it.
+ *
+ * Safe because the CRM does the discriminating: a word that is not a customer comes back
+ * empty rather than matching something approximate.
+ */
+export function companyCandidates(event: CalendarEvent): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (value: string) => {
+    const name = value.trim()
+    const key = name.toLowerCase()
+    if (!name || seen.has(key)) return
+    seen.add(key)
+    out.push(name)
+  }
+
+  // 1. Who was actually in the room.
+  for (const company of externalCompanies(event)) add(company)
+
+  // 2. What the meeting was called. Acronyms first — on this calendar a run of capitals is
+  //    almost always the customer (NVM, BOVAG, DDA, ISO).
+  const words = event.subject.split(/[^\p{L}\p{N}-]+/u).filter(Boolean)
+  const significant = words.filter(
+    (w) => w.length >= 3 && !SUBJECT_NOISE.has(w.toLowerCase()),
+  )
+  for (const word of significant.filter((w) => w === w.toUpperCase())) add(word)
+  for (const word of significant) add(word)
+
+  return out.slice(0, MAX_COMPANY_CANDIDATES)
 }
 
 // ---------------------------------------------------------------------------
@@ -313,14 +298,22 @@ function toActionItem(issue: LinearIssue): ActionItemRow {
 // Defaults
 // ---------------------------------------------------------------------------
 
-async function defaultLoadEvent(eventId: string): Promise<CalendarEvent | null> {
-  const todayKey = toDateKey(new Date())
-  const today = await fetchEventsForDay(todayKey)
+async function defaultLoadEvent(
+  eventId: string,
+  dateKey: string = toDateKey(new Date()),
+): Promise<CalendarEvent | null> {
+  // Ask Graph for the event itself first. The day scans below only ever find meetings in
+  // the current week, and a panel reached from a task's *Meetings* block routinely points
+  // at something months old — which used to open five empty containers.
+  const direct = await fetchEventById(eventId)
+  if (direct) return direct
+
+  const today = await fetchEventsForDay(dateKey)
   const hit = today.find((e) => e.id === eventId)
   if (hit) return hit
 
   // A panel can be opened from the week zone or restored from a URL on another day.
-  const week = await fetchEventsForWeek(weekdaysOf(todayKey))
+  const week = await fetchEventsForWeek(weekdaysOf(dateKey))
   for (const day of Object.values(week)) {
     const match = day.find((e) => e.id === eventId)
     if (match) return match
@@ -351,7 +344,9 @@ export async function buildMeetingDrill(
   deps: MeetingDrillDeps = {},
 ): Promise<DrillPayload> {
   const now = deps.now ?? Date.now
-  const event = await (deps.loadEvent ?? defaultLoadEvent)(eventId).catch(() => null)
+  const event = await (deps.loadEvent ?? ((id: string) => defaultLoadEvent(id, deps.dateKey)))(
+    eventId,
+  ).catch(() => null)
 
   if (!event) {
     return {
@@ -394,14 +389,23 @@ export async function buildMeetingDrill(
     runBlock<AccountData>(
       'account',
       async () => {
-        const [company] = externalCompanies(event)
-        if (!company) return { empty: true }
-        const result = await (deps.loadAccount ?? accountStatus)(company)
-        if (!result.ok) {
-          if (result.reason === 'unconfigured') return { empty: true }
-          return blockFailure(result.message)
+        const lookup = deps.loadAccount ?? accountStatus
+        let failure: string | null = null
+
+        // Candidates in descending confidence; the first that resolves wins.
+        for (const candidate of companyCandidates(event)) {
+          const result = await lookup(candidate)
+          if (!result.ok) {
+            if (result.reason === 'unconfigured') return { empty: true }
+            // Remember it, but keep trying: one bad candidate is not a dead CRM.
+            failure ??= result.message
+            continue
+          }
+          if (result.data) return { data: result.data }
         }
-        return { data: result.data ?? undefined }
+
+        if (failure) return blockFailure(failure)
+        return { empty: true }
       },
       now,
     ),
@@ -461,60 +465,6 @@ function subtitleFor(event: CalendarEvent): string | null {
 // The other drill types (PRD §8, "Other drill-in types")
 // ---------------------------------------------------------------------------
 
-export interface GenericDrillDeps {
-  loadIssues?: () => Promise<LinearIssue[]>
-  now?: () => number
-}
-
-/**
- * The issue drill-in, reduced to the block vocabulary the panel already speaks.
- *
- * `lib/types.ts` fixes the five block ids, so an issue reuses *Open action items* for the
- * issue and its neighbours and leaves the rest honestly empty rather than inventing ids.
- * Enough to make the trail real (meeting → issue) without pretending to a full build.
- */
-export async function buildIssueDrill(
-  identifier: string,
-  deps: GenericDrillDeps = {},
-): Promise<DrillPayload> {
-  const now = deps.now ?? Date.now
-  const key = identifier.trim().toUpperCase()
-
-  const items = await runBlock<ActionItemRow[]>(
-    'action-items',
-    async () => {
-      const issues = await (deps.loadIssues ?? fetchIssues)()
-      const self = issues.find((i) => i.identifier.toUpperCase() === key)
-      if (!self) return { empty: true }
-      const tokens = self.title
-        .toLowerCase()
-        .split(/[^a-z0-9-]+/)
-        .filter((w) => w.length > 3 && !STOPWORDS.has(w))
-      const neighbours = issues
-        .filter((i) => i.identifier !== self.identifier)
-        .filter((i) => tokens.some((t) => i.title.toLowerCase().includes(t)))
-        .slice(0, 5)
-      return { data: [self, ...neighbours].map(toActionItem) }
-    },
-    now,
-  )
-
-  const issue = items.data?.[0]
-
-  return {
-    type: 'issue',
-    id: key,
-    title: issue ? `${issue.identifier} · ${issue.title}` : key,
-    subtitle: issue?.state ?? null,
-    action: { label: 'Open in Linear', href: issue?.url ?? null },
-    blocks: BLOCK_ORDER.map((id) =>
-      id === 'action-items'
-        ? items
-        : { id, title: BLOCK_TITLES[id], status: 'empty' as const, elapsedMs: 0 },
-    ),
-  }
-}
-
 /**
  * Person and account drill-ins are specified (PRD §8) but not built. They render as five
  * empty containers with the right escape hatch rather than a dead end or a lie.
@@ -535,13 +485,19 @@ export function buildPlaceholderDrill(type: 'person' | 'account', id: string): D
   }
 }
 
-/** Routes a drill request to its builder. Never throws. */
+/**
+ * Routes a drill request to its builder. Never throws.
+ *
+ * `dateKey` is the day the dashboard behind the panel is showing (PRD §17.14). It matters
+ * to the meeting builder, which resolves an event by scanning a day's calendar, and to the
+ * issue builder, which uses it to decide what counts as an upcoming meeting.
+ */
 export async function buildDrill(
   type: DrillType,
   id: string,
-  deps: MeetingDrillDeps = {},
+  deps: MeetingDrillDeps & IssueDrillDeps = {},
 ): Promise<DrillPayload> {
-  if (type === 'meeting') return buildMeetingDrill(id, deps)
   if (type === 'issue') return buildIssueDrill(id, deps)
+  if (type === 'meeting') return buildMeetingDrill(id, deps)
   return buildPlaceholderDrill(type, id)
 }

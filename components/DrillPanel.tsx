@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { TID, testid } from '@/lib/testids'
 // Runtime values come from the client-safe module; the rest are type-only imports,
 // which are erased at build time and so never reach the browser bundle.
-import { BLOCK_ORDER, BLOCK_TITLES } from '@/lib/drill/blocks'
+import { BLOCK_TITLES, blockOrderFor } from '@/lib/drill/blocks'
 import type { DrillBlockId, DrillType } from '@/lib/drill/blocks'
 import type { DrillAction, DrillPayload } from '@/lib/drill/meeting'
 import type { DrillBlock as DrillBlockModel } from '@/lib/types'
@@ -54,11 +54,16 @@ export type DrillFetcher = (
   id: string,
   blockId: DrillBlockId,
   signal?: AbortSignal,
+  dateKey?: string | null,
 ) => Promise<DrillFetchResult>
 
-const defaultFetcher: DrillFetcher = async (type, id, blockId, signal) => {
+const defaultFetcher: DrillFetcher = async (type, id, blockId, signal, dateKey) => {
+  const search = new URLSearchParams({ block: blockId })
+  // A meeting is resolved by scanning a day's calendar, so a panel opened from a preview
+  // of another date has to say which date it means or the event will not be found.
+  if (dateKey) search.set('date', dateKey)
   const res = await fetch(
-    `/api/drill/${type}/${encodeURIComponent(id)}?block=${encodeURIComponent(blockId)}`,
+    `/api/drill/${type}/${encodeURIComponent(id)}?${search.toString()}`,
     { signal, headers: { accept: 'application/json' } },
   )
   if (!res.ok) throw new Error(`Drill request failed (${res.status})`)
@@ -131,6 +136,8 @@ function defaultAction(type: DrillType): DrillAction {
 export interface DrillPanelProps {
   /** Test seam. Production uses the route handler. */
   fetcher?: DrillFetcher
+  /** The day the dashboard behind the panel is showing, when it is not today. */
+  dateKey?: string | null
 }
 
 export default function DrillPanel(props: DrillPanelProps) {
@@ -146,7 +153,7 @@ export default function DrillPanel(props: DrillPanelProps) {
 /** How long the exit animation runs — must match `.panelClosing` in drill.module.css. */
 const EXIT_MS = 200
 
-function DrillPanelInner({ fetcher = defaultFetcher }: DrillPanelProps) {
+function DrillPanelInner({ fetcher = defaultFetcher, dateKey = null }: DrillPanelProps) {
   const searchParams = useSearchParams()
   const raw = searchParams.get(PARAM)
   const urlTrail = useMemo(() => parseTrail(raw), [raw])
@@ -258,6 +265,7 @@ function DrillPanelInner({ fetcher = defaultFetcher }: DrillPanelProps) {
       <Panel
         key={currentKey}
         entry={current}
+        dateKey={dateKey}
         entryKey={currentKey}
         trail={trail}
         titles={titles}
@@ -279,6 +287,7 @@ function DrillPanelInner({ fetcher = defaultFetcher }: DrillPanelProps) {
 
 interface PanelProps {
   entry: TrailEntry
+  dateKey: string | null
   entryKey: string
   trail: TrailEntry[]
   titles: Record<string, string>
@@ -293,6 +302,7 @@ interface PanelProps {
 
 function Panel({
   entry,
+  dateKey,
   entryKey,
   trail,
   titles,
@@ -304,7 +314,7 @@ function Panel({
   onJump,
   onTitle,
 }: PanelProps) {
-  const { blocks, meta, retry } = useDrillData(entry, fetcher)
+  const { blocks, meta, retry } = useDrillData(entry, fetcher, dateKey)
   const panelRef = useRef<HTMLElement | null>(null)
   const touchStartY = useRef<number | null>(null)
 
@@ -406,12 +416,15 @@ function Panel({
         </div>
       </header>
 
-      {/* Laid out from the static order, never from the response order (PRD §8). */}
+      {/*
+        Laid out from the static order for this drill type, never from the response order
+        (PRD §8). A meeting and an issue have different fives; both have a fixed five.
+      */}
       <div className={styles.blocks}>
-        {BLOCK_ORDER.map((id) => (
+        {blockOrderFor(entry.type).map((id) => (
           <DrillBlock
             key={id}
-            block={blocks[id]}
+            block={blocks[id] ?? { id, title: BLOCK_TITLES[id], status: 'loading' }}
             onRetry={() => retry(id)}
             onDrill={(type, targetId) => onDrill(type, targetId)}
             subject={`${entry.type}:${entry.id}`}
@@ -445,7 +458,7 @@ function Panel({
 // Per-block loading
 // ---------------------------------------------------------------------------
 
-type BlockMap = Record<DrillBlockId, DrillBlockModel<unknown>>
+type BlockMap = Partial<Record<DrillBlockId, DrillBlockModel<unknown>>>
 
 /**
  * The opening state: five titled containers, all of them in flight.
@@ -453,9 +466,9 @@ type BlockMap = Record<DrillBlockId, DrillBlockModel<unknown>>
  * They start as `loading` rather than `pending` because that is the truth one tick after
  * mount — every block is requested on the same frame the panel appears.
  */
-function loadingBlocks(): BlockMap {
+function loadingBlocks(type: DrillType): BlockMap {
   const map = {} as BlockMap
-  for (const id of BLOCK_ORDER) {
+  for (const id of blockOrderFor(type)) {
     map[id] = { id, title: BLOCK_TITLES[id], status: 'loading' }
   }
   return map
@@ -474,15 +487,15 @@ interface DrillMeta {
  * renders from {@link BLOCK_ORDER} rather than from this map's insertion order, an
  * out-of-order arrival changes one container's contents and nothing else's position.
  */
-function useDrillData(entry: TrailEntry, fetcher: DrillFetcher) {
-  const [blocks, setBlocks] = useState<BlockMap>(loadingBlocks)
+function useDrillData(entry: TrailEntry, fetcher: DrillFetcher, dateKey: string | null) {
+  const [blocks, setBlocks] = useState<BlockMap>(() => loadingBlocks(entry.type))
   const [meta, setMeta] = useState<DrillMeta | null>(null)
   const alive = useRef(true)
   const { type, id } = entry
 
   const load = useCallback(
     (blockId: DrillBlockId) => {
-      fetcher(type, id, blockId)
+      fetcher(type, id, blockId, undefined, dateKey)
         .then((result) => {
           if (!alive.current) return
           setBlocks((prev) => ({ ...prev, [blockId]: result.block }))
@@ -502,14 +515,14 @@ function useDrillData(entry: TrailEntry, fetcher: DrillFetcher) {
           setBlocks((prev) => ({
             ...prev,
             [blockId]: {
-              ...prev[blockId],
+              ...(prev[blockId] ?? { id: blockId, title: BLOCK_TITLES[blockId] }),
               status: 'failed',
               error: 'Could not reach the server',
             },
           }))
         })
     },
-    [fetcher, type, id],
+    [fetcher, type, id, dateKey],
   )
 
   /** *Retry* puts one block back in flight and leaves the other four untouched. */
@@ -517,7 +530,11 @@ function useDrillData(entry: TrailEntry, fetcher: DrillFetcher) {
     (blockId: DrillBlockId) => {
       setBlocks((prev) => ({
         ...prev,
-        [blockId]: { ...prev[blockId], status: 'loading', error: undefined },
+        [blockId]: {
+          ...(prev[blockId] ?? { id: blockId, title: BLOCK_TITLES[blockId] }),
+          status: 'loading',
+          error: undefined,
+        },
       }))
       load(blockId)
     },
@@ -528,11 +545,11 @@ function useDrillData(entry: TrailEntry, fetcher: DrillFetcher) {
   // with fresh in-flight blocks — nothing to reset here, only requests to start.
   useEffect(() => {
     alive.current = true
-    for (const blockId of BLOCK_ORDER) load(blockId)
+    for (const blockId of blockOrderFor(type)) load(blockId)
     return () => {
       alive.current = false
     }
-  }, [load])
+  }, [load, type])
 
   return { blocks, meta, retry }
 }

@@ -3,16 +3,18 @@
 import { useState } from 'react'
 
 import { TID, testid } from '@/lib/testids'
+import { formatDayMonth } from '@/lib/time'
 // The runtime value comes from the client-safe module; the rest are type-only and are
 // erased at build time, so the server-only drill module never reaches the browser.
 import { BLOCK_SOURCE_LABELS } from '@/lib/drill/blocks'
-import type { DrillBlockId } from '@/lib/drill/blocks'
+import type { DrillBlockId, DrillType } from '@/lib/drill/blocks'
 import type {
   AccountData,
   ActionItemRow,
   AttendeeRow,
   ProseData,
 } from '@/lib/drill/meeting'
+import type { IssueDetail, MailRow, MeetingRow } from '@/lib/drill/issue'
 import type { DrillBlock as DrillBlockModel, SourceRef } from '@/lib/types'
 import styles from './drill.module.css'
 
@@ -34,14 +36,21 @@ import styles from './drill.module.css'
 export interface DrillBlockProps {
   block: DrillBlockModel<unknown>
   onRetry: () => void
-  /** Drilling from a drill-in pushes onto the trail — it never opens a second panel. */
-  onDrill?: (type: 'issue' | 'person' | 'account', id: string) => void
+  /**
+   * Drilling from a drill-in pushes onto the trail — it never opens a second panel.
+   *
+   * Includes `meeting`, so a task's *Meetings* row can hop to that meeting's own panel.
+   * It must go through this callback rather than through an `<a href="?drill=…">`: a
+   * query-only link replaces the whole query string, which throws the trail away and
+   * lands the reader in a one-crumb panel with no way back to the task.
+   */
+  onDrill?: (type: DrillType, id: string) => void
   /** What this block is about, e.g. `meeting:AAMk…` — recorded with any feedback. */
   subject?: string
 }
 
 /** Blocks whose content is written by the model, and so can be wrong (PRD §9). */
-const SYNTHESISED: ReadonlySet<string> = new Set(['last-time', 'unresolved'])
+const SYNTHESISED: ReadonlySet<string> = new Set(['last-time', 'unresolved', 'said'])
 
 export default function DrillBlock({ block, onRetry, onDrill, subject }: DrillBlockProps) {
   const failed = block.status === 'failed'
@@ -173,6 +182,11 @@ const SKELETON_LINES: Record<DrillBlockId, number> = {
   'action-items': 2,
   account: 2,
   unresolved: 3,
+  'issue-detail': 3,
+  said: 3,
+  'related-issues': 2,
+  meetings: 2,
+  email: 2,
 }
 
 function Skeleton({ id }: { id: DrillBlockId }) {
@@ -210,7 +224,16 @@ function Body({
       return <Account data={block.data as AccountData} />
     case 'last-time':
     case 'unresolved':
+    case 'said':
       return <Prose data={block.data as ProseData} sources={block.sources ?? []} />
+    case 'issue-detail':
+      return <Detail data={block.data as IssueDetail} sources={block.sources ?? []} />
+    case 'related-issues':
+      return <ActionItems rows={(block.data as ActionItemRow[]) ?? []} onDrill={onDrill} />
+    case 'meetings':
+      return <Meetings rows={(block.data as MeetingRow[]) ?? []} onDrill={onDrill} />
+    case 'email':
+      return <Mail rows={(block.data as MailRow[]) ?? []} />
   }
 }
 
@@ -366,6 +389,167 @@ function Prose({ data, sources }: { data: ProseData | undefined; sources: Source
         </p>
       ))}
       <Sources sources={sources} inferred={data.inferred} />
+    </div>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Issue panel bodies (PRD §8, "Other drill-in types")
+// ---------------------------------------------------------------------------
+
+const ORIGIN_WORDS: Record<string, string> = {
+  fireflies: 'a meeting recording',
+  outlook: 'an email',
+  outlook_calendar: 'a calendar item',
+  slack: 'a Slack message',
+  local_files: 'a file',
+}
+
+/**
+ * Block 1 — the task itself.
+ *
+ * The one block in this panel that cannot fail: it is Linear data the page already holds.
+ * Its job is to state the facts and, when the task was machine-extracted, to say so —
+ * "Written down from a meeting recording, 11 Sep" with a link to the recording. A reader
+ * who knows a task was transcribed from a call reads everything below it differently.
+ */
+function Detail({ data, sources }: { data: IssueDetail | undefined; sources: SourceRef[] }) {
+  if (!data) return null
+
+  const facts = [
+    data.state,
+    data.dueDate ? `due ${data.dueDate}` : null,
+    data.hasRelations ? 'has relations' : null,
+  ].filter(Boolean)
+
+  return (
+    <div>
+      <p className={styles.rowMeta}>{facts.join(' · ')}</p>
+
+      {/*
+        Labelled parts, each with its own quiet heading. The pipeline writes an outcome and
+        a completion criterion; the panel is the place that has to make them readable.
+      */}
+      {data.sections.map((section, i) => (
+        <div key={`${section.label ?? 'body'}-${i}`} className={styles.section}>
+          {section.label && <h4 className={styles.sectionLabel}>{section.label}</h4>}
+          <p className={`${styles.prose} voice-written`}>{section.body}</p>
+        </div>
+      ))}
+
+      {data.labels.length > 0 && (
+        <p className={styles.rowMeta}>{data.labels.join(' · ')}</p>
+      )}
+
+      {data.origin && (
+        <p className={styles.rowMeta}>
+          Written down from {ORIGIN_WORDS[data.origin.sourceType] ?? data.origin.sourceType}
+          {data.origin.evidenceDate ? ` on ${data.origin.evidenceDate}` : ''}.
+        </p>
+      )}
+
+      <Sources sources={sources} inferred={false} />
+    </div>
+  )
+}
+
+/** `28 Aug`, or `30 Oct 2025` once it is not this year. Shared with the source labels. */
+const when = (iso: string | null) => formatDayMonth(iso)
+
+/**
+ * Block 4 — the meetings this task was discussed in, past and upcoming.
+ *
+ * A row whose calendar event Omni recorded is a **drill target**: clicking it opens that
+ * meeting's own panel on the trail, which is the trail PRD §8 describes running the other
+ * way — meeting → issue → back to the meeting it came out of.
+ */
+function Meetings({
+  rows,
+  onDrill,
+}: {
+  rows: MeetingRow[]
+  onDrill?: DrillBlockProps['onDrill']
+}) {
+  return (
+    <div className={styles.rows}>
+      {rows.map((row, i) => {
+        const meta = [when(row.date), row.participants.length ? `${row.participants.length} in the room` : null]
+          .filter(Boolean)
+          .join(' · ')
+        const body = (
+          <>
+            <span className={styles.rowMain}>
+              <span className={styles.rowTitle} title={row.title}>
+                {row.title}
+              </span>
+              {meta && <span className={styles.rowMeta}>{meta}</span>}
+            </span>
+            <span className={styles.rowRight}>{row.upcoming ? 'Upcoming' : 'Past'}</span>
+          </>
+        )
+
+        // Pushes onto the trail; never a link, which would replace the query string and
+        // take the trail with it.
+        return row.eventId && onDrill ? (
+          <button
+            key={`${row.title}-${i}`}
+            type="button"
+            className={`${styles.row} ${styles.rowButton} list-row`}
+            data-drill={`meeting:${row.eventId}`}
+            onClick={() => onDrill('meeting', row.eventId!)}
+          >
+            {body}
+          </button>
+        ) : row.url ? (
+          <a
+            key={`${row.title}-${i}`}
+            className={`${styles.row} ${styles.rowButton} list-row`}
+            href={row.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {body}
+          </a>
+        ) : (
+          <div key={`${row.title}-${i}`} className={`${styles.row} list-row`}>
+            {body}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Block 5 — the mail threads this task turns up in. Each row opens in Outlook. */
+function Mail({ rows }: { rows: MailRow[] }) {
+  return (
+    <div className={styles.rows}>
+      {rows.map((row, i) => {
+        const meta = [row.from, when(row.date)].filter(Boolean).join(' · ')
+        const body = (
+          <span className={styles.rowMain}>
+            <span className={styles.rowTitle}>{row.subject}</span>
+            {meta && <span className={styles.rowMeta}>{meta}</span>}
+            {row.excerpt && <span className={styles.rowExcerpt}>{row.excerpt}</span>}
+          </span>
+        )
+        return row.url ? (
+          <a
+            key={`${row.subject}-${i}`}
+            className={`${styles.row} ${styles.rowButton} list-row`}
+            href={row.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {body}
+          </a>
+        ) : (
+          <div key={`${row.subject}-${i}`} className={`${styles.row} list-row`}>
+            {body}
+          </div>
+        )
+      })}
     </div>
   )
 }

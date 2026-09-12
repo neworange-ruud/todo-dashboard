@@ -1067,3 +1067,201 @@ recommendation for today, never tells the reader to work, and names what Monday 
 
 Live output: *"It is the weekend. Monday opens with overdue RW-772, while a heavily booked
 Wednesday will constrain the rest of the week."*
+
+---
+
+## 20. The shape of a working day (round 4)
+
+Two recurring events on the calendar are not meetings — they are the frame the day is drawn
+inside. Both are zero-invitee, `showAs: busy`, and recur every Wednesday:
+
+| Block | Time | Means |
+|---|---|---|
+| *Vrij houden (geen meetings plannen zonder te overleggen)* | 09:00–13:00 | **Protected working time.** The work happens; the meetings do not. |
+| *Niet beschikbaar* | 13:00–17:30 | **Outside working hours.** |
+
+Read as ordinary meetings — which is what every zone did until now — they billed **eight and a
+half hours of load to a day holding two half-hour meetings**, drew as two walls down the
+timeline, and made every real Wednesday meeting register as a double-booking against the block
+it sat inside. That last one fired weekly, in the one zone §9 says cannot afford a false
+positive.
+
+### The rule that matters is about what is inside them
+
+A container frames time; it never claims it. Anything else scheduled in either window is
+genuine and shows exactly as it would on any other day — the 10:00 *Check-in Starterscheck*
+inside the protected morning is a real meeting, and *Oma Ada haalt kids op* at 14:00 inside the
+non-work block is a real commitment, shown and marked **Outside working hours**. Only the frame
+itself is demoted.
+
+### Consequences, by zone
+
+- **Timeline** — containers leave the rows. An empty stretch inside the protected morning reads
+  `4H KEPT CLEAR` rather than `4H FREE`: the time is empty either way, but "free" invites a
+  booking and this time was deliberately not for booking. The day ends where work ends unless
+  something real sits past it.
+- **Week** — the bar measures against the day that is actually left. A blocked afternoon leaves
+  a four-hour Wednesday, and an hour of meetings fills a quarter of it. **Numerator and
+  denominator agree about which hours exist**: a 14:00 commitment is not billed against a
+  morning it never touched.
+- **Attention** — containers are excluded from conflict detection.
+- **Sentence and matching** — the model is never handed *Niet beschikbaar* as a meeting.
+
+Classification is by subject and solitude, **never by weekday**: the meaning belongs to the
+block, and a genuine meeting that happens to be called "Niet beschikbaar" has other people in
+it and stays a meeting.
+
+---
+
+## 21. The date override (round 4)
+
+`?date=` moves the whole dashboard to another day. Today is the default and needs no parameter.
+
+Accepts `YYYY-MM-DD`, `today` / `tomorrow` / `yesterday`, a weekday name (the next such day, or
+today when today is that day), and a signed offset like `+3`. **Anything unreadable resolves to
+today** — a mistyped link opens the live day, never an error page.
+
+It is a change of subject, not a filter: the timeline, the week, due, needs-planning, attention,
+the sentence and the drill-in all follow the viewed day. Only the clock stays real, and it stops
+participating — there is no NOW rule on a day that is not today, the timeline zone is headed
+with that day's name rather than `TODAY`, and the sentence names the day instead of saying
+"today". The attention strip moves its reference instant to that day's midnight and opens its
+horizon to the whole day, so it answers "what already looks wrong about Monday".
+
+**A preview must never be mistakable for the live dashboard** (§9). The bar carries
+`PREVIEW · BACK TO TODAY` in the warning hue beside the date, and it doubles as the way back.
+
+Date navigation is server-rendered links, so it survives with JavaScript off. Both flags are
+carried into every drill-in link — a bare `?drill=…` replaces the whole query string, which had
+already been silently dropping `?display=board` on every click.
+
+---
+
+## 22. The task drill-in (round 4)
+
+§8 specified the issue panel and it was built as one populated block out of five. It now has its
+own five, parallel in structure to the meeting panel's:
+
+| # | Block | Source | Arrives |
+|---|---|---|---|
+| 1 | **The task** — state, due, labels, relations, description, where it came from | Linear | Instant |
+| 2 | **What was said** — what was discussed about *this task*, quoted and cited | Omni → Fireflies | ~2–4s |
+| 3 | **Related tasks** — neighbours by shared subject words | Linear | Fast |
+| 4 | **Meetings** — where it was discussed, past and upcoming | Omni → calendar | ~1–2s |
+| 5 | **Email** — the threads it turns up in | Omni → Outlook | ~1–2s |
+
+### Provenance: the field nothing was reading
+
+A task on this board is usually not something that was typed. It was extracted from a meeting or
+a mail thread, and its Linear description ends with a pointer at the exact Omni document:
+
+```
+Provenance: Omni fireflies/01M27T2KN8ENXYZD57Q43E1MM0; evidence 2026-09-11
+```
+
+Verified across the live board (12 Sep 2026): of 100 issues, **22 carry a pointer** — 14 to
+Outlook mail, 7 to Fireflies transcripts, 1 to a calendar item.
+
+So *What was said* is **not a search**. It is a fetch of one transcript by id, read whole,
+synthesised into two or three sentences about what was discussed, cited back to the recording. A
+task with no pointer falls back to a keyword sweep over transcripts, and so does a pointer Omni
+cannot resolve — a dead id is a reason to look elsewhere, not a reason to show an error.
+
+The prompt's failure mode is the opposite of *Last time*'s: the risk is not finding the wrong
+meeting, it is summarising a whole meeting when the reader asked about one task inside it.
+
+### Task → meeting → task
+
+Omni's calendar documents carry `metadata.extra.event_id`, which is the Graph event id verbatim.
+Every meeting row is therefore a real drill target, and pushes onto the trail rather than
+navigating — a `?drill=` link would replace the query string and take the trail with it.
+
+### Omni findings that were failing silently (12 Sep 2026)
+
+Three, all verified live, none of which produced an error:
+
+1. **Search text arrives as `highlights`, an array on the hit.** Nothing Omni returns is called
+   `snippet`, `excerpt` or `text` — so every document reaching the synthesiser carried
+   `content: (none indexed)`, and *Last time* and *Unresolved* had been writing from titles
+   alone since they were built.
+2. **`attributes` is empty on every document.** The real metadata lives under `metadata` and
+   `metadata.extra`. The extras are shaped two ways: `fireflies` nests
+   (`extra.fireflies.participants`), `outlook_calendar` is flat (`extra.event_id`). Reading only
+   the nested form left every meeting row unopenable.
+3. **`GET /api/v1/documents/{id}` returns the whole body** in `content` — for documents up to
+   roughly 100KB. Above that it comes back null and search highlights are the only text, which
+   is exactly the case for a long transcript.
+
+Omni also rate-limits bursts with a 429. The task panel now issues **one** search for meetings
+and email together rather than one each; they differ only by source type, and three parallel
+searches tripped the limit whenever two panels were opened in quick succession.
+
+---
+
+## 23. Round-5 corrections
+
+Six things found by reading the built product rather than the code.
+
+### Provenance has three formats, not one
+
+The extraction pipeline has written its provenance block three different ways, and §22 only
+handled the first — so three quarters of the board had no pointer and, worse, had the whole
+raw block printed at the reader as though it were the description:
+
+| | Shape | Reference |
+|---|---|---|
+| A | `Provenance: Omni <type>/<id>; evidence <date>` | the id directly |
+| B | `### Provenance` + `* Source:` / `* Source reference:` bullets | `omni://<source_id>/<doc_id>` |
+| C | `Provenance: source=…; source_url=…; evidence_at=…; inference_note=…` | `omni://<source_id>/<doc_id>` |
+
+In B and C the **second** segment of the `omni://` reference is the document id. B also
+appears without its `### Provenance` heading, the bullets simply trailing the description,
+which a heading-anchored rule missed entirely.
+
+The description itself is now split on its labels — *Outcome*, *Completion criterion* — which
+both styles write and which ran together into one undifferentiated sentence.
+
+### What was said always links the recording
+
+`sources` only ever carried what the synthesis could attribute statement by statement, so an
+*inferred* answer had nothing to click — and when the pointed-to transcript was too large for
+Omni to return (`content: null` above ~100KB) the fallback search attached six links to
+unrelated calls beneath a sentence saying nothing had been discussed. The recording the task
+was written down from now leads the list whether or not it was cited, **and nothing else does
+unless the model actually used it**. A recording that could be named but not read says so.
+
+### Omni's 502 is weather, not an answer
+
+The search service intermittently returns 502 and 429 under load; the same request succeeds a
+moment later. Requests now retry twice with a short backoff. 401 and 404 are deliberately not
+retried — they are answers.
+
+### Account status was asking the wrong question
+
+`accountStatus` works and always did: `NVM` returns three open opportunities and a sent
+invoice. The block was only ever given company names derived from **external attendee email
+domains**, and a meeting called *NVM offerte* with nobody but Ruud in it has none — so the
+block reported *Nothing found* about an account the CRM knows well. Candidates now fall back
+to the subject, acronyms first. Safe because Brain does the discriminating: verified live,
+`Starterscheck`, `Weekstart`, `Bitwarden` and `ISO` all return nothing while `NVM` and
+`BOVAG` return the account.
+
+### The state dot belongs to the row's identity
+
+`align-self: center` put the marker in the gap between a two-line title's lines, belonging to
+neither. It sits on the line the issue key is on.
+
+### Theme control (PRD §10)
+
+*Auto → Light → Dark*, remembered in `localStorage`. Three states because the stylesheet
+already distinguishes three: no `data-theme` attribute means follow the system, and the two
+explicit values win in either direction.
+
+The choice is applied by a tiny inline script in `<head>`, before first paint — otherwise the
+page renders in the system theme and snaps a frame later, which on this palette is a flash of
+white. The control reads the store through `useSyncExternalStore`, which hands the server's
+`system` over to the real value cleanly and gets cross-tab agreement for free.
+
+`window.localStorage` **throws on property access** where site data is blocked, before any
+method is called, so a try/catch inside the reader never runs — that took the entire control
+off the page until `safeStorage()` wrapped the access itself.

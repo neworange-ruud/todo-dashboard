@@ -256,6 +256,47 @@ async function fetchRange(start: Date, end: Date, fetchImpl?: FetchLike): Promis
   return mapEvents(res.value)
 }
 
+/**
+ * The `events/{id}` path for one event.
+ *
+ * SECURITY: same rule as {@link calendarViewPath} — the mailbox is the compile-time
+ * constant and never a parameter. `tests/identity.test.ts` asserts this against every
+ * outgoing URL, this one included.
+ */
+export function eventPath(eventId: string): string {
+  const query = new URLSearchParams({ $select: SELECT })
+  return `/users/${GRAPH_USER_PRINCIPAL_NAME}/events/${encodeURIComponent(eventId)}?${query}`
+}
+
+/**
+ * One event, by its own id, whatever day it falls on.
+ *
+ * The drill-in used to find an event by scanning today's calendar and then the working
+ * week, which is fine for a panel opened from the timeline and useless for one opened from
+ * a task: a task's meetings are frequently months old, and a link to a meeting the panel
+ * cannot resolve opens five empty containers. Verified against a January occurrence.
+ *
+ * Returns null for an id Graph does not recognise (404) rather than throwing, because a
+ * dead link is an empty panel and not an incident.
+ */
+export async function fetchEventById(
+  eventId: string,
+  fetchImpl?: FetchLike,
+): Promise<CalendarEvent | null> {
+  if (!eventId.trim()) return null
+  return getOrFetch(`graph:events:id:${eventId}`, TTL.graph, async () => {
+    try {
+      const raw = await graphGet<GraphEvent>(eventPath(eventId), fetchImpl ?? fetch)
+      const event = mapEvent(raw)
+      // A cancelled meeting is still worth reading about; `mapEvents` drops those only
+      // because a cancelled row has no business occupying space in a timeline.
+      return event
+    } catch {
+      return null
+    }
+  })
+}
+
 /** Every event on `dateKey` (`YYYY-MM-DD`), cached for {@link TTL.graph}. */
 export async function fetchEventsForDay(
   dateKey: string,

@@ -9,6 +9,7 @@ function issue(identifier: string, title: string, state: TaskState, dueDate: str
     identifier,
     title,
     dueDate,
+    description: null,
     priority: 0,
     state,
     labels: [],

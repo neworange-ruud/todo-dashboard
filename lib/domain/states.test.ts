@@ -15,6 +15,7 @@ function issue(partial: Partial<LinearIssue> & { identifier: string; state: Task
   return {
     title: 'Untitled',
     dueDate: null,
+    description: null,
     priority: 0,
     labels: [],
     url: `https://linear.app/rw/issue/${partial.identifier}`,

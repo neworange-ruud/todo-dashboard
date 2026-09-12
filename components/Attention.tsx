@@ -1,8 +1,12 @@
 import { TID, testid } from '@/lib/testids'
+import { withView, type ViewParams } from '@/lib/view-href'
 import type { AttentionItem } from '@/lib/types'
 import styles from './zones.module.css'
 
 export interface AttentionProps {
+  /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
+  view?: ViewParams
+
   items: AttentionItem[]
 }
 
@@ -20,7 +24,7 @@ const MAX_ITEMS = 3
  * Everything here is named in full: no badges, no counts, no red dot on an icon.
  * A count with no name is anxiety with no information.
  */
-export default function Attention({ items }: AttentionProps) {
+export default function Attention({ items, view }: AttentionProps) {
   if (items.length === 0) return null
 
   const shown = items.slice(0, MAX_ITEMS)
@@ -31,7 +35,7 @@ export default function Attention({ items }: AttentionProps) {
       {shown.map((item) => (
         <a
           key={`${item.href}:${item.text}`}
-          href={item.href}
+          href={withView(item.href, view)}
           className={`${styles.attentionItem} stripe list-row`}
         >
           <span className={styles.attentionLabel}>NEEDS ATTENTION</span>

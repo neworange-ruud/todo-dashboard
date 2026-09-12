@@ -18,12 +18,17 @@
  */
 
 import { completeStructured, type CompleteStructuredRequest } from './client'
-import { LAST_TIME_SYSTEM_PROMPT, UNRESOLVED_SYSTEM_PROMPT } from './prompts'
+import {
+  LAST_TIME_SYSTEM_PROMPT,
+  UNRESOLVED_SYSTEM_PROMPT,
+  WHAT_WAS_SAID_SYSTEM_PROMPT,
+} from './prompts'
 import { getOrFetch } from '../cache'
-import { MODELS, TIMEZONE, TTL } from '../config'
-import { formatTime, toDateKey } from '../time'
+import { MODELS, TTL } from '../config'
+import { formatDayMonth, formatTime, toDateKey } from '../time'
 import type { OmniSearchResult } from '../omni/client'
-import type { CalendarEvent, OmniDocument, SourceRef } from '../types'
+import { withoutProvenance } from '../domain/provenance'
+import type { CalendarEvent, LinearIssue, OmniDocument, SourceRef } from '../types'
 
 // ---------------------------------------------------------------------------
 // Result
@@ -112,31 +117,30 @@ function documentsOf(input: OmniInput): OmniDocument[] {
 }
 
 /**
- * Three letters, always. `Intl`'s own `month: 'short'` renders September as "Sept" in en-GB,
- * which breaks the alignment of a column of mono source labels, so the abbreviations are
- * fixed here and only the date arithmetic is delegated.
+ * `"28 Aug"` — the form PRD §8 shows in `↗ Meeting notes, 28 Aug`, with the year added
+ * once it is not this one.
+ *
+ * Delegated to `lib/time.formatDayMonth`, which owns the hand-fixed month abbreviations:
+ * `Intl`'s en-GB `month: 'short'` spells September "Sept", and this label sits in the same
+ * panel as the drill-in's own date stamps.
  */
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const shortDate = (iso: string | null) => formatDayMonth(iso)
 
-const dayMonthFormat = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TIMEZONE,
-  day: 'numeric',
-  month: 'numeric',
-})
+/**
+ * Fireflies' own name for a recording nobody titled: `Sep 04, 01:04 PM`.
+ *
+ * Such a title already *is* a date, so the usual ", 4 Sep" suffix produces
+ * "Sep 04, 01:04 PM, 4 Sep" — the same day said twice, in two different formats.
+ */
+const TIMESTAMP_TITLE = /^[A-Z][a-z]{2}\s+\d{1,2},\s+\d{1,2}:\d{2}\s*(?:AM|PM)$/
 
-/** `"28 Aug"` — the form PRD §8 shows in `↗ Meeting notes, 28 Aug`. */
-function shortDate(iso: string | null): string | null {
-  if (!iso) return null
-  const parsed = Date.parse(iso)
-  if (Number.isNaN(parsed)) return null
-  const [day, month] = dayMonthFormat.format(new Date(parsed)).split('/').map(Number)
-  return `${day} ${MONTHS[month - 1] ?? month}`
-}
-
+/** `↗ Meeting notes, 28 Aug` — the form PRD §8 asks of every sourced claim. */
 export function toSourceRef(doc: OmniDocument): SourceRef {
+  const title = doc.title.trim()
   const when = shortDate(doc.date)
+  const label = when && !TIMESTAMP_TITLE.test(title) ? `${title}, ${when}` : title
   return {
-    label: when ? `${doc.title}, ${when}` : doc.title,
+    label,
     ...(doc.url ? { url: doc.url } : {}),
     documentId: doc.id,
   }
@@ -271,4 +275,58 @@ export async function unresolved(
   complete: SynthesisCompleter = defaultCompleter,
 ): Promise<SynthesisResult> {
   return synthesise('unresolved', UNRESOLVED_SYSTEM_PROMPT, event, omniDocs, complete)
+}
+
+// ---------------------------------------------------------------------------
+// The issue panel — "What was said"
+// ---------------------------------------------------------------------------
+
+function describeIssue(issue: LinearIssue): string {
+  return [
+    `Task: ${issue.identifier} — ${issue.title}`,
+    `State: ${issue.state}${issue.dueDate ? ` | due ${issue.dueDate}` : ''}`,
+    issue.labels.length ? `Labels: ${issue.labels.join(', ')}` : null,
+    // The description is the extraction's own summary of the task. Handing it over lets
+    // the model tell the difference between what the transcript says about this task and
+    // what it says about the eleven other things discussed in the same hour.
+    withoutProvenance(issue.description) ? `Stated outcome: ${withoutProvenance(issue.description)}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * Block 2 of the issue drill-in: what was said about this task, in the meeting it came from.
+ *
+ * Cached per issue per document set, and keyed on `updatedAt` so editing the task in Linear
+ * produces a fresh reading rather than yesterday's.
+ *
+ * Same contract as {@link lastTime} in every other respect: no documents means
+ * {@link emptyResult} and no model call, an unsourceable statement is kept and marked
+ * inferred, and a citation to a document that was not supplied loses its citation but
+ * keeps its claim.
+ */
+export async function whatWasSaid(
+  issue: LinearIssue,
+  input: OmniInput,
+  complete: SynthesisCompleter = defaultCompleter,
+): Promise<SynthesisResult> {
+  const docs = documentsOf(input).slice(0, MAX_DOCUMENTS)
+  if (docs.length === 0) return emptyResult()
+
+  const cacheKey = `synthesis:said:${issue.identifier}:${issue.updatedAt}:${docs.map((d) => d.id).join(',')}`
+
+  return getOrFetch(cacheKey, TTL.synthesis, async () => {
+    const draft = await complete({
+      system: WHAT_WAS_SAID_SYSTEM_PROMPT,
+      user: `${describeIssue(issue)}\n\nDOCUMENTS\n\n${describeDocuments(docs)}`,
+      schema: DRAFT_SCHEMA,
+      schemaName: 'drill_what_was_said',
+      model: MODELS.synthesis,
+      // A whole transcript goes in, so the answer is allowed a little more room than the
+      // meeting panel's blocks — but it is still two or three sentences.
+      maxTokens: 900,
+    })
+    return assemble(draft, docs)
+  })
 }

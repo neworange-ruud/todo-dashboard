@@ -1,10 +1,14 @@
 import { isNew, provenanceOf } from '@/lib/domain/states'
 import { TID, testid } from '@/lib/testids'
+import { drillHref, type ViewParams } from '@/lib/view-href'
 import { daysBetween, dueLabel, formatDuration } from '@/lib/time'
 import type { DayLoad, DisplayMode, LinearIssue, TaskState } from '@/lib/types'
 import styles from './zones.module.css'
 
 export interface WeekProps {
+  /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
+  view?: ViewParams
+
   load: DayLoad[]
   /** Already soonest-first (`lib/domain/states.dueThisWeek`). Rendered in the order given. */
   due: LinearIssue[]
@@ -84,6 +88,7 @@ export default function Week({
   todayKey,
   mode = 'default',
   unavailable,
+  view,
 }: WeekProps) {
   const readyCount = planning.filter((issue) => !isNew(issue)).length
   const newCount = planning.length - readyCount
@@ -102,21 +107,27 @@ export default function Week({
         </div>
         <div className={styles.lanes} {...testid(TID.loadLanes)}>
           {load.map((day) => {
-            const share = Math.min(100, Math.round((day.bookedMinutes / day.workdayMinutes) * 100))
+            // A day with no working time left has no denominator. It is not zero per cent
+            // booked and it is not fully booked either — it is simply not a working day,
+            // and an empty track says that without a word of explanation.
+            const offDay = day.workdayMinutes === 0
+            const share = offDay
+              ? 0
+              : Math.min(100, Math.round((day.bookedMinutes / day.workdayMinutes) * 100))
+            const reading = offDay
+              ? `${day.label}: not a working day`
+              : `${day.label}: ${formatDuration(day.bookedMinutes)} booked of ${formatDuration(day.workdayMinutes)}`
             return (
               <div
                 key={day.date}
                 className={styles.lane}
                 data-today={day.isToday ? 'true' : 'false'}
                 data-heavy={day.isHeavy ? 'true' : 'false'}
+                data-off={offDay ? 'true' : 'false'}
                 {...testid(TID.loadLane)}
               >
                 <span className={styles.laneLabel}>{day.label}</span>
-                <span
-                  className={styles.laneTrack}
-                  role="img"
-                  aria-label={`${day.label}: ${formatDuration(day.bookedMinutes)} booked of ${formatDuration(day.workdayMinutes)}`}
-                >
+                <span className={styles.laneTrack} role="img" aria-label={reading}>
                   <span
                     className={styles.laneBooked}
                     style={{ width: `${share}%` }}
@@ -147,7 +158,7 @@ export default function Week({
                   className={`${styles.dueRow} list-row crossfade`}
                   {...testid(TID.dueRow)}
                 >
-                  <a href={`?drill=issue:${issue.identifier}`} className={styles.dueMain}>
+                  <a href={drillHref('issue', issue.identifier, view)} className={styles.dueMain}>
                     <span
                       className={styles.dot}
                       data-filled={isStarted(issue.state) ? 'true' : 'false'}
@@ -187,7 +198,7 @@ export default function Week({
                   className={`${styles.planningRow} list-row crossfade`}
                   {...testid(TID.planningRow)}
                 >
-                  <a href={`?drill=issue:${issue.identifier}`} className={styles.planningMain}>
+                  <a href={drillHref('issue', issue.identifier, view)} className={styles.planningMain}>
                     <span
                       className={styles.dot}
                       data-filled={isStarted(issue.state) ? 'true' : 'false'}

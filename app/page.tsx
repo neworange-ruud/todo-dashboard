@@ -9,7 +9,7 @@ import Horizons from '@/components/Horizons'
 import DrillPanel from '@/components/DrillPanel'
 import { buildDashboard } from '@/lib/view-model'
 import { generateSentence } from '@/lib/ai/sentence'
-import { startOfLocalDay } from '@/lib/time'
+import { addDays, resolveViewDate, startOfLocalDay } from '@/lib/time'
 import { TIMEZONE } from '@/lib/config'
 import type { DisplayMode } from '@/lib/types'
 
@@ -24,6 +24,13 @@ import type { DisplayMode } from '@/lib/types'
 // The dashboard is a live reading of external systems; never statically cached.
 export const dynamic = 'force-dynamic'
 
+/** `WEDNESDAY` — the zone label for a day that is not today. */
+function weekdayLabel(dateKey: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, weekday: 'long' })
+    .format(startOfLocalDay(dateKey))
+    .toUpperCase()
+}
+
 function formatDateLabel(todayKey: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: TIMEZONE,
@@ -33,16 +40,39 @@ function formatDateLabel(todayKey: string): string {
   }).format(startOfLocalDay(todayKey))
 }
 
+/**
+ * A dashboard address carrying both flags.
+ *
+ * Plain links, resolved on the server: date navigation is a change of subject, not an
+ * interaction, so it wants a new render rather than client state — and it keeps working
+ * with JavaScript off, which the wall monitor occasionally appreciates.
+ */
+function href(display: DisplayMode, dateKey: string | null): string {
+  const search = new URLSearchParams()
+  if (display === 'board') search.set('display', 'board')
+  if (dateKey) search.set('date', dateKey)
+  const query = search.toString()
+  return query ? `/?${query}` : '/'
+}
+
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ display?: string }>
+  searchParams: Promise<{ display?: string; date?: string }>
 }) {
   // Board mode is an explicit flag, never inferred from viewport width (PRD §17.13).
-  const { display: displayParam } = await searchParams
+  const { display: displayParam, date: dateParam } = await searchParams
   const display: DisplayMode = displayParam === 'board' ? 'board' : 'default'
 
-  const model = await buildDashboard(display)
+  // `?date=` moves the whole dashboard to another day (PRD §17.14). Anything unreadable
+  // resolves to today rather than erroring — see `resolveViewDate`.
+  const view = resolveViewDate(dateParam)
+
+  const model = await buildDashboard(display, new Date(), view.key)
+
+  // Carried into every link the zones write, so opening a drill-in from a preview of
+  // Monday does not drop the dashboard back onto today behind the panel.
+  const viewParams = { display, date: view.isToday ? null : view.key }
 
   // The sentence is the one zone allowed to fail without taking the page with it:
   // it is generated, not fetched, and PRD §4 says silence is never acceptable — so a
@@ -52,18 +82,34 @@ export default async function Page({
 
   return (
     <Shell display={display}>
-      <Bar dateLabel={formatDateLabel(model.todayKey)} sync={model.sync} />
+      <Bar
+        dateLabel={formatDateLabel(model.todayKey)}
+        sync={model.sync}
+        isToday={model.isToday}
+        nav={{
+          previous: href(display, addDays(model.todayKey, -1)),
+          next: href(display, addDays(model.todayKey, 1)),
+          today: href(display, null),
+        }}
+      />
 
       {/* Zone 1 renders nothing at all when nothing qualifies — zero height, not collapsed. */}
-      <Attention items={model.attention} />
+      <Attention items={model.attention} view={viewParams} />
 
-      <Sentence sentence={sentence} loading={sentence === null} />
+      <Sentence sentence={sentence} loading={sentence === null} view={viewParams} />
 
       <Horizons
         today={
           <>
-            <Timeline layout={model.timeline} now={model.now} mode={display} />
-            <TopFive tasks={model.ranked} mode={display} />
+            <Timeline
+              layout={model.timeline}
+              now={model.now}
+              mode={display}
+              view={viewParams}
+              isToday={model.isToday}
+              heading={model.isToday ? 'TODAY' : weekdayLabel(model.todayKey)}
+            />
+            <TopFive tasks={model.ranked} mode={display} view={viewParams} />
           </>
         }
         week={
@@ -73,6 +119,7 @@ export default async function Page({
             planning={model.planning}
             todayKey={model.todayKey}
             mode={display}
+            view={viewParams}
           />
         }
       />
@@ -82,7 +129,7 @@ export default async function Page({
         stays out of the data path above — opening a panel never re-runs the page.
         It renders nothing until the query param appears.
       */}
-      <DrillPanel />
+      <DrillPanel dateKey={view.isToday ? null : view.key} />
     </Shell>
   )
 }

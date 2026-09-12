@@ -223,10 +223,36 @@ describe('search', () => {
     await search({ query: 'cached' }, { fetch: good })
     expect(good).toHaveBeenCalledTimes(1)
 
+    // A failure is not cached, so the second call really goes back to Omni. Each call now
+    // spends its own full retry budget (Omni 502s intermittently under load), so the count
+    // is attempts-per-call × calls rather than calls.
     const bad = vi.fn(async () => failure(500))
     await search({ query: 'uncached' }, { fetch: bad })
+    const afterFirst = bad.mock.calls.length
     await search({ query: 'uncached' }, { fetch: bad })
-    expect(bad).toHaveBeenCalledTimes(2)
+    expect(afterFirst).toBeGreaterThan(0)
+    expect(bad.mock.calls.length).toBe(afterFirst * 2)
+  })
+
+  it('retries a 502 and succeeds, so the reader never sees the blip', async () => {
+    // Verified live: the search service answers 502 intermittently under load and the very
+    // same request succeeds a moment later. That is a retry, not a rendered failure.
+    let calls = 0
+    const flaky = vi.fn(async () => {
+      calls += 1
+      return calls === 1 ? failure(502) : ok({ results: [hit()] })
+    })
+    const result = await search({ query: 'flaky-502' }, { fetch: flaky })
+    expect(result.ok).toBe(true)
+    expect(calls).toBe(2)
+  })
+
+  it('does not retry an answer, only weather', async () => {
+    // 401 means the key is wrong. Asking three times does not make it right.
+    const denied = vi.fn(async () => failure(401))
+    const result = await search({ query: 'denied-401' }, { fetch: denied })
+    expect(result.ok).toBe(false)
+    expect(denied).toHaveBeenCalledTimes(1)
   })
 })
 

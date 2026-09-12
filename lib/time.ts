@@ -117,6 +117,42 @@ export function formatTime(date: Date | string): string {
   return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
 }
 
+/**
+ * Three-letter months, fixed by hand.
+ *
+ * `Intl`'s own `month: 'short'` renders September as **"Sept"** in en-GB. That breaks the
+ * alignment of a column of mono source labels, and — worse — it put "10 Sept" directly
+ * beside a "↗ …, 11 Sep" citation in the same drill-in panel. One list, two spellings of
+ * the same month, is the kind of detail that makes a careful page look careless.
+ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const dayMonthParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TIMEZONE,
+  day: 'numeric',
+  month: 'numeric',
+  year: 'numeric',
+})
+
+/**
+ * `"28 Aug"`, or `"30 Oct 2025"` once it is not the current year.
+ *
+ * The year is not decoration: a task's *Meetings* block routinely lists something from
+ * eleven months ago beside something from last week, and "30 Oct" alone reads as next
+ * month. Returns null for anything unparseable, so a caller can omit the stamp entirely
+ * rather than print a placeholder.
+ */
+export function formatDayMonth(iso: string | null | undefined, now: Date = new Date()): string | null {
+  if (!iso) return null
+  const parsed = Date.parse(iso)
+  if (Number.isNaN(parsed)) return null
+  const f: Record<string, string> = {}
+  for (const part of dayMonthParts.formatToParts(new Date(parsed))) f[part.type] = part.value
+  const month = MONTHS[Number(f.month) - 1] ?? f.month
+  const stamp = `${Number(f.day)} ${month}`
+  return f.year === String(parts(now).year) ? stamp : `${stamp} ${f.year}`
+}
+
 /** Compact duration: "45M", "1H 15M", "2H". */
 export function formatDuration(minutes: number): string {
   const m = Math.max(0, Math.round(minutes))
@@ -136,6 +172,89 @@ export function formatRelative(from: Date | number, now: Date = new Date()): str
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
+}
+
+// ---------------------------------------------------------------------------
+// The date override (PRD §17.14)
+// ---------------------------------------------------------------------------
+
+/**
+ * How far either side of today the dashboard will look.
+ *
+ * Wide enough to answer "what does Monday look like" and to check back over a quarter,
+ * narrow enough that a typo or a crawler cannot send the calendar fetcher somewhere
+ * expensive and meaningless.
+ */
+export const VIEW_DATE_RANGE_DAYS = 180
+
+const DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+export interface ViewDate {
+  /** The day the dashboard is drawing, `YYYY-MM-DD`. */
+  key: string
+  /** True when that day is really today — the only case where "now" means anything. */
+  isToday: boolean
+}
+
+/** `dateKey` shifted by whole days, keeping to local midnights across a DST boundary. */
+export function addDays(dateKey: string, days: number): string {
+  // Noon, so a 23- or 25-hour day cannot round the arithmetic onto a neighbour.
+  const at = startOfLocalDay(dateKey).getTime() + days * 86_400_000 + 12 * 3600_000
+  return toDateKey(new Date(at))
+}
+
+/**
+ * Reads the `?date=` parameter (PRD §17.14).
+ *
+ * Accepts a plain `YYYY-MM-DD`, the words *today* / *tomorrow* / *yesterday*, a weekday
+ * name resolving to the next such day (or today, when today is that day), and a signed
+ * day offset like `+3` or `-1`.
+ *
+ * **Anything it cannot read becomes today.** A dashboard is judged on its bad days (PRD
+ * §9): a mistyped link should open on the live day, never on an error page and never on
+ * some silently invented date. The caller is told which day it landed on, and the bar says
+ * so out loud whenever that is not today.
+ */
+export function resolveViewDate(param: string | null | undefined, now: Date = new Date()): ViewDate {
+  const todayKey = toDateKey(now)
+  const key = parseViewDate(param, todayKey)
+  return { key, isToday: key === todayKey }
+}
+
+function parseViewDate(param: string | null | undefined, todayKey: string): string {
+  const raw = param?.trim().toLowerCase()
+  if (!raw || raw === 'today') return todayKey
+
+  if (raw === 'tomorrow') return addDays(todayKey, 1)
+  if (raw === 'yesterday') return addDays(todayKey, -1)
+
+  const offset = /^([+-]\d{1,3})$/.exec(raw)
+  if (offset) return clampToRange(addDays(todayKey, Number(offset[1])), todayKey)
+
+  const weekday = WEEKDAY_NAMES.indexOf(raw)
+  if (weekday >= 0) {
+    const current = parts(startOfLocalDay(todayKey)).weekday
+    // "Monday" on a Monday means today, not a week from now — you are asking about the
+    // day you named, and the nearest one you can still do something about is this one.
+    return addDays(todayKey, (weekday - current + 7) % 7)
+  }
+
+  const explicit = DATE_KEY_RE.exec(raw)
+  if (explicit) {
+    const [, y, m, d] = explicit
+    // Round-trips through the calendar, so 2026-02-31 is rejected rather than rolled over.
+    const candidate = `${y}-${m}-${d}`
+    if (toDateKey(startOfLocalDay(candidate)) !== candidate) return todayKey
+    return clampToRange(candidate, todayKey)
+  }
+
+  return todayKey
+}
+
+function clampToRange(candidate: string, todayKey: string): string {
+  const delta = daysBetween(candidate, todayKey)
+  return Math.abs(delta) > VIEW_DATE_RANGE_DAYS ? todayKey : candidate
 }
 
 /** Whole days between two `YYYY-MM-DD` keys. Negative when `a` is before `b`. */

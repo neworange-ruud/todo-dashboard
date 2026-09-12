@@ -6,8 +6,9 @@ import { dueThisWeek, needsPlanning } from './domain/states'
 import { buildTimeline } from './domain/timeline'
 import { buildWeekLoad } from './domain/week'
 import { buildAttention } from './domain/attention'
+import { NOMINAL_WORKDAY_MINUTES } from './domain/shape'
 import { matchIssuesToMeetings } from './ai/matching'
-import { toDateKey, weekdaysOf } from './time'
+import { startOfLocalDay, toDateKey, weekdaysOf } from './time'
 import { newestStoredAt } from './cache'
 import { STALE_AFTER_MS } from './config'
 import type {
@@ -31,9 +32,15 @@ import type {
  */
 
 export interface DashboardModel {
+  /**
+   * The day being drawn. Named for the common case; with `?date=` in play it is the
+   * viewed day, and {@link DashboardModel.isToday} is what says which.
+   */
   todayKey: string
   now: Date
   display: DisplayMode
+  /** False when a date override is in effect — the one thing the bar must never hide. */
+  isToday: boolean
   attention: AttentionItem[]
   timeline: TimelineLayout
   ranked: RankedTask[]
@@ -50,6 +57,7 @@ const EMPTY_TIMELINE: TimelineLayout = {
   rows: [],
   bookedMinutes: 0,
   freeMinutes: 0,
+  availableMinutes: NOMINAL_WORKDAY_MINUTES,
 }
 
 async function settle<T>(p: Promise<T>, fallback: T): Promise<[T, SourceHealth]> {
@@ -60,11 +68,19 @@ async function settle<T>(p: Promise<T>, fallback: T): Promise<[T, SourceHealth]>
   }
 }
 
+/**
+ * @param dateKey The day to draw. Defaults to today; supplied by `?date=` (PRD §17.14),
+ *   which is a genuine change of subject rather than a filter — every zone below follows
+ *   it, and only the clock stays real.
+ */
 export async function buildDashboard(
   display: DisplayMode = 'default',
   now: Date = new Date(),
+  dateKey?: string,
 ): Promise<DashboardModel> {
-  const todayKey = toDateKey(now)
+  const realTodayKey = toDateKey(now)
+  const todayKey = dateKey ?? realTodayKey
+  const isToday = todayKey === realTodayKey
   const weekKeys = weekdaysOf(todayKey)
 
   // Fetched together rather than in sequence: three round trips, not three waterfalls.
@@ -85,13 +101,25 @@ export async function buildDashboard(
   const ranked = rankTasks(issues, { todayKey, meetingLinks })
 
   const timeline =
-    graphHealth === 'ok' ? buildTimeline(todayEvents, now, { nowOnward: display === 'board' }) : EMPTY_TIMELINE
+    graphHealth === 'ok'
+      ? buildTimeline(todayEvents, now, { nowOnward: display === 'board', dateKey: todayKey })
+      : EMPTY_TIMELINE
 
   return {
     todayKey,
     now,
     display,
-    attention: buildAttention({ issues, events: todayEvents, todayKey, now }),
+    isToday,
+    // On a preview the reference instant moves to that day's midnight and the conflict
+    // horizon opens to the whole day, so the strip answers "what already looks wrong about
+    // Monday" instead of the four-hour question, which only today can be asked.
+    attention: buildAttention({
+      issues,
+      events: todayEvents,
+      todayKey,
+      now: isToday ? now : startOfLocalDay(todayKey),
+      ...(isToday ? {} : { horizonHours: 24 }),
+    }),
     timeline,
     ranked,
     due: dueThisWeek(issues, weekKeys, todayKey),

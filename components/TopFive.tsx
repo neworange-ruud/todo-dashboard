@@ -1,9 +1,13 @@
 import { TID, testid } from '@/lib/testids'
+import { drillHref, type ViewParams } from '@/lib/view-href'
 import type { DisplayMode, RankedTask, TaskState } from '@/lib/types'
 import styles from './zones.module.css'
 
 
 export interface TopFiveProps {
+  /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
+  view?: ViewParams
+
   tasks: RankedTask[]
   /** Presentation profile (PRD §17.13). Board caps the list at three. */
   mode?: DisplayMode
@@ -65,7 +69,7 @@ function UnavailableLine({ source, since }: { source: string; since?: string }) 
  * The dots stay ink-grey: the reason line already carries urgency in words, and five
  * coloured dots down the most important column buys nothing.
  */
-export default function TopFive({ tasks, mode = 'default', unavailable }: TopFiveProps) {
+export default function TopFive({ tasks, mode = 'default', unavailable, view }: TopFiveProps) {
   const rows = tasks.slice(0, MAX_ROWS)
   const visible = mode === 'board' ? rows.slice(0, BOARD_ROWS) : rows
 
@@ -105,7 +109,7 @@ export default function TopFive({ tasks, mode = 'default', unavailable }: TopFiv
           const issue = task.issue
           return (
             <li key={issue.identifier} className={`${styles.taskRow} list-row crossfade`} {...testid(TID.taskRow)}>
-              <a href={`?drill=issue:${issue.identifier}`} className={styles.taskMain}>
+              <a href={drillHref('issue', issue.identifier, view)} className={styles.taskMain}>
                 <span className={`${styles.rank} num`}>{task.rank}</span>
                 <span
                   className={styles.dot}
