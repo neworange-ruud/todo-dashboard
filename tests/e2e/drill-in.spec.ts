@@ -15,6 +15,18 @@ async function openFirstMeeting(page: Page): Promise<boolean> {
   if ((await events.count()) === 0) return false
   await events.first().click()
   await page.waitForSelector(t(TID.panel), { timeout: 10_000 })
+  /*
+   * Wait for the panel to be *interactive*, not merely present.
+   *
+   * `waitForSelector` returns the moment the element enters the DOM, which is before React
+   * has flushed the effects that attach the Escape listener and move focus. A test that
+   * pressed a key in that window was racing a paint — something no reader can do, and it
+   * showed up as a mobile-only flake once the page had enough client work to widen the gap.
+   *
+   * Focus lands in the same effect pass as the key listener, so a focused panel is proof
+   * the listener is attached. That makes this a real readiness signal rather than a sleep.
+   */
+  await expect(page.locator(t(TID.panel))).toBeFocused({ timeout: 5000 })
   return true
 }
 

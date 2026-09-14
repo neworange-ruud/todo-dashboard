@@ -12,17 +12,38 @@ Full specification in [PRD.md](./PRD.md).
 
 ```bash
 npm install
-npm run dev          # http://127.0.0.1:3000
+npm run dev          # http://127.0.0.1:41733
 ```
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Dev server, bound to loopback only |
+| `npm run dev` | Dev server, bound to loopback only, on port **41733** |
 | `npm run build` / `npm start` | Production build and serve |
 | `npm run test` | Unit tests (vitest) |
 | `npm run test:e2e` | Browser tests (Playwright) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run verify` | typecheck + lint + unit tests |
+
+### The port
+
+**41733, not 3000.** Port 3000 collects orphans — any other Node project on this machine claims
+it first, `next dev` then exits with `EADDRINUSE`, and you spend an afternoon testing a server
+that has been running since this morning. Playwright reads the same port, so the two cannot
+drift.
+
+Set `PORT` to override it in both places:
+
+```bash
+PORT=45000 npm run dev
+```
+
+If a start ever seems not to take effect, the server is almost certainly already running. Its
+process is named `next-server`, not `next dev`, so `pkill -f "next dev"` will not find it —
+kill it by port instead:
+
+```bash
+lsof -ti :41733 | xargs kill -9
+```
 
 ## Environment
 
@@ -89,8 +110,8 @@ Tailnet `tail981ec3.ts.net`, node `ruuds-macbook-pro-2023`. **Hermes already own
 (proxying `127.0.0.1:27462`), so Task Desk publishes on its own HTTPS port:
 
 ```bash
-npm run build && npm start                              # binds 127.0.0.1:3000
-tailscale serve --bg --https=8443 http://127.0.0.1:3000
+npm run build && npm start                               # binds 127.0.0.1:41733
+tailscale serve --bg --https=8443 http://127.0.0.1:41733
 tailscale serve status                                  # confirm
 ```
 

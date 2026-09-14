@@ -929,11 +929,11 @@ needs a trustworthy MCP client; connection is confirmed by calling `whoami`.
 - Funnel is **not** enabled; everything is tailnet-only. Correct — the tailnet is the security
   boundary (§12.1) and Task Desk must never be funnelled to the public internet.
 
-**Proposed:** bind Next.js to `127.0.0.1:3000` and publish it on its own HTTPS port so it does not
+**Proposed:** bind Next.js to `127.0.0.1:41733` and publish it on its own HTTPS port so it does not
 collide with Hermes and needs no `basePath`:
 
 ```
-tailscale serve --bg --https=8443 http://127.0.0.1:3000
+tailscale serve --bg --https=8443 http://127.0.0.1:41733
 ```
 
 giving `https://ruuds-macbook-pro-2023.tail981ec3.ts.net:8443`. The alternative — a path such as
