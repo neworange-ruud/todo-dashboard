@@ -83,13 +83,15 @@ is the only navigation in the product.
 The switcher dissolves. The sentence runs full width; the three horizons sit side by side,
 weighted 1.2 / 0.9 / 0.9. Today earns the extra width because it carries two sub-columns.
 
-### Wall monitor — 1440×720, always on
+### Wall monitor — 1600×600, always on
 
-The desktop layout, not a separate mode. The 720px height is the real constraint — roughly half
-a normal viewport, so the page must fit without scrolling. Three tunings only:
+The desktop layout, not a separate mode. The 600px height is the real constraint — barely two
+thirds of a normal viewport, so the page must fit without scrolling. The 1600px width is the one
+dimension the monitor has to spare, so the page measure rises from 1440 to meet it. Three tunings
+only:
 
 - Sentence caps at two lines and truncates with a "more" affordance; the timeline shows **now
-  onward only**; each horizon column shows its top three and the rest is a count.
+  onward only**; each horizon column shows its top two and the rest is a count.
 - Type goes up one step, not three. Base 17px rather than 15px.
 - It re-reads itself: the sentence re-renders as the day progresses. Same component, different
   input.
@@ -957,13 +959,14 @@ component branches on viewport width to decide it.
 
 | | Default (`/`) | Board (`/?display=board`) |
 |---|---|---|
-| Target | Phone and desktop | The always-on 1440×720 wall monitor |
+| Target | Phone and desktop | The always-on 1600×600 wall monitor |
 | Selected by | Nothing — the default | Explicit query flag only, never inferred from viewport |
+| Page measure | Max 1440px | Max **1600px** — the monitor's full width, not letterboxed |
 | Type scale | Base 15px | Base **17px** — one step, not three |
 | Sentence | Full, up to ~50 words | **Caps at two lines**, truncates with a "more" affordance |
 | Timeline | Whole day; past events dimmed and kept | **Now onward only** — past events removed, not collapsed |
-| List length | Everything (§17.5) | **Top three per block**, remainder as a named count in the header |
-| Must fit without scrolling | No | **Yes.** 720px is the hard constraint. |
+| List length | Everything (§17.5) | **Top two per block**, remainder as a named count in the header |
+| Must fit without scrolling | No | **Yes.** 600px is the hard constraint. |
 | Refresh | On load, plus manual | **Polls on an interval** and re-renders in place |
 | Open cascade (§11) | Once per session | Once on first paint only — **never on a poll refresh** |
 
@@ -979,8 +982,8 @@ component branches on viewport width to decide it.
   (§10). The wall monitor is the strongest argument for dark and is the reason it must be as
   considered as light.
 
-**Why a flag and not a breakpoint.** The wall monitor is 1440×720 — a width indistinguishable from
-an ordinary laptop. Inferring board mode from the viewport would flip a normal desktop browser into
+**Why a flag and not a breakpoint.** The wall monitor is 1600×600 — a width indistinguishable from
+an ordinary laptop window. Inferring board mode from the viewport would flip a normal desktop browser into
 a truncated, polling display the moment someone resized a window. The mode is a deployment choice,
 so it is stated, not guessed.
 

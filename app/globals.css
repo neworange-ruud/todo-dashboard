@@ -157,7 +157,7 @@ a {
 
 /*
  * Board mode (PRD §17.13) — an explicit `data-display="board"` attribute on
- * the Shell wrapper, never inferred from viewport width. 1440x720 is
+ * the Shell wrapper, never inferred from viewport width. 1600x600 is
  * indistinguishable from an ordinary laptop window, so treating it as a
  * breakpoint would silently flip a resized desktop browser into the
  * truncated, polling wall-monitor presentation. The flag bumps the base
@@ -169,7 +169,7 @@ a {
 }
 
 /*
- * The 720px budget (PRD §17.13).
+ * The 600px budget (PRD §17.13).
  *
  * §10's vertical rhythm is 32px and a hairline between zones. That rhythm is a
  * proportion of the type it separates, and board mode has already rescaled the type —
@@ -177,27 +177,38 @@ a {
  * is allowed to scroll. The hairline stays, the order stays, the content stays: this is
  * the same "truncate and rescale" the flag is allowed to do, and it is the difference
  * between fitting the wall monitor and not.
+ *
+ * One step tighter than the 720px monitor asked for: 600px is five sixths of the height
+ * the rhythm was set against, and the five zone boundaries are the cheapest 40px on the
+ * page — cheaper than a row of content or a step of type, both of which the reader
+ * actually reads from across the room.
  */
 [data-display='board'] .shell__zones > * + * {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
 }
 
 /*
- * The board is exactly one screen and never scrolls — 720px is the hard constraint
+ * The board is exactly one screen and never scrolls — 600px is the hard constraint
  * (PRD §17.13), so the page is sized to the screen rather than hoping the content
  * happens to fit. Nothing about the layout changes: the same zones in the same order
  * at the same widths, with the height budget made explicit instead of implicit.
  *
+ * The monitor is 1600px wide, so the board raises the 1440px page measure to match it
+ * rather than sitting letterboxed inside 80px of paper on either side. This is the one
+ * dimension the wall monitor has *more* of than a laptop, and the width goes where it
+ * is worth most: the Today column's two sub-columns and the week's load lanes.
+ *
  * The slack goes to the timeline, which is the one zone that already owns a scroll
  * container by design (§5 auto-scrolls it to "now"), so a fuller day spends its extra
  * height there rather than pushing the week off the bottom of the monitor. `overflow:
- * hidden` is the last-resort guard behind the top-three caps, not the mechanism: the
+ * hidden` is the last-resort guard behind the top-two caps, not the mechanism: the
  * caps and the named counts are what keep the content inside the budget.
  */
 [data-display='board'].shell {
   height: 100vh;
-  padding-block: var(--space-4);
+  max-width: 1600px;
+  padding-block: var(--space-3);
   overflow: hidden;
 }
 

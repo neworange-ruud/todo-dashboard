@@ -21,8 +21,8 @@ export interface TopFiveProps {
 }
 
 const MAX_ROWS = 5
-/** Board mode is the one place the §17.5 caps return — 720px is a hard constraint. */
-const BOARD_ROWS = 3
+/** Board mode is the one place the §17.5 caps return — 600px is a hard constraint. */
+const BOARD_ROWS = 2
 
 /** Shape carries state: filled = started work, hollow = not started (PRD §6, §17.3). */
 function isStarted(state: TaskState): boolean {
@@ -95,7 +95,7 @@ export default function TopFive({ tasks, mode = 'default', unavailable, view }: 
       <div className={styles.zoneHead}>
         <p className={styles.zoneLabel}>TOP FIVE</p>
         {/*
-         * The full length of the list, named by its header. In board mode only three
+         * The full length of the list, named by its header. In board mode only two
          * rows are drawn, so this count *is* how the remainder is reported — a count
          * inside a named header is fine; a bare badge is not (PRD §9).
          */}

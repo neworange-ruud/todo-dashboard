@@ -98,11 +98,11 @@ simply re-warms it. Nothing is ever written to Omni's Postgres or the archive da
 | URL | For |
 |---|---|
 | `/` | Phone and desktop |
-| `/?display=board` | The always-on 1440×720 wall monitor |
+| `/?display=board` | The always-on 1600×600 wall monitor |
 
-Board mode is an explicit flag, never inferred from viewport width — 1440×720 is
-indistinguishable from an ordinary laptop, so inferring it would flip a normal browser into a
-truncated polling display on resize. See PRD §17.13.
+Board mode is an explicit flag, never inferred from viewport width — 1600×600 is
+indistinguishable from an ordinary laptop window, so inferring it would flip a normal browser
+into a truncated polling display on resize. See PRD §17.13.
 
 ## Serving over Tailscale
 

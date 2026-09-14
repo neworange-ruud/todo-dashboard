@@ -10,7 +10,7 @@ import type { DayLoad, LinearIssue, RankedTask, TaskState } from '@/lib/types'
  *
  * §17.5 removed the `⌄ N more` caps because the real board is small enough to render
  * whole. That holds for the default view and only the default view: the wall monitor
- * has 720px and no scrollbar, so each block draws **three** rows and the header's named
+ * has 600px and no scrollbar, so each block draws **two** rows and the header's named
  * count carries the rest. A count inside a named header is fine; a bare badge is not
  * (§9), which is why every assertion below checks the header as well as the rows.
  */
@@ -66,20 +66,21 @@ const planning: LinearIssue[] = Array.from({ length: 6 }, (_, i) =>
 )
 
 describe('Board mode — top five', () => {
-  it('draws three rows and names the full length in the header', () => {
+  it('draws two rows and names the full length in the header', () => {
     render(<TopFive tasks={ranked} mode="board" />)
 
-    expect(screen.getAllByTestId(TID.taskRow)).toHaveLength(3)
+    expect(screen.getAllByTestId(TID.taskRow)).toHaveLength(2)
     expect(screen.getByTestId('top-five-count')).toHaveTextContent('5')
+    expect(screen.queryByText('Prepare the design sync agenda')).not.toBeInTheDocument()
     expect(screen.queryByText('Close out the September invoices')).not.toBeInTheDocument()
   })
 
-  it('keeps the three it draws in rank order, with their reason lines intact', () => {
+  it('keeps the two it draws in rank order, with their reason lines intact', () => {
     render(<TopFive tasks={ranked} mode="board" />)
 
     const rows = screen.getAllByTestId(TID.taskRow)
     expect(rows[0]).toHaveTextContent('Migrate the Acme mailboxes')
-    expect(rows[2]).toHaveTextContent('Prepare the design sync agenda')
+    expect(rows[1]).toHaveTextContent('Write the migration runbook')
     // The cap truncates; it never strips the argument behind a row (PRD §6).
     for (const row of rows) {
       expect(within(row).getByTestId(TID.taskReason).textContent?.trim()).not.toBe('')
@@ -95,21 +96,21 @@ describe('Board mode — top five', () => {
 })
 
 describe('Board mode — week', () => {
-  it('caps due this week at three and leaves the count naming the remainder', () => {
+  it('caps due this week at two and leaves the count naming the remainder', () => {
     render(<Week load={load} due={due} planning={planning} todayKey={TODAY} mode="board" />)
 
-    expect(screen.getAllByTestId(TID.dueRow)).toHaveLength(3)
+    expect(screen.getAllByTestId(TID.dueRow)).toHaveLength(2)
 
     const block = screen.getByTestId(TID.dueThisWeek)
     expect(within(block).getByText('DUE THIS WEEK')).toBeInTheDocument()
-    // "DUE THIS WEEK · 9", showing 3.
+    // "DUE THIS WEEK · 9", showing 2.
     expect(block.textContent).toContain('9')
   })
 
-  it('caps needs planning at three and keeps both halves of its named count', () => {
+  it('caps needs planning at two and keeps both halves of its named count', () => {
     render(<Week load={load} due={due} planning={planning} todayKey={TODAY} mode="board" />)
 
-    expect(screen.getAllByTestId(TID.planningRow)).toHaveLength(3)
+    expect(screen.getAllByTestId(TID.planningRow)).toHaveLength(2)
     // Four Ready and two Inbox in the data, whatever is drawn.
     expect(screen.getByTestId(TID.needsPlanning).textContent).toContain('4 READY · 2 NEW')
   })

@@ -341,7 +341,7 @@
 }
 
 /*
- * Board mode must fit 1440x720 without scrolling the *page* (PRD §17.13). The timeline
+ * Board mode must fit 1600x600 without scrolling the *page* (PRD §17.13). The timeline
  * already owns a scroll container of its own — §5 auto-scrolls it to "now" — so it is
  * the zone that absorbs whatever height the rest of the board leaves, rather than
  * carrying a fixed cap that is too tall on a busy day and wastes the monitor on a
@@ -568,17 +568,22 @@
 }
 
 /*
- * Board mode: TOP THREE per block, the remainder carried by the named count in the
+ * Board mode: TOP TWO per block, the remainder carried by the named count in the
  * header (PRD §17.13). This is the one place §17.5's "show everything" does not apply,
  * and it applies to the default view only.
+ *
+ * Two rather than three because the monitor is 600px, not 720: the third row of each
+ * block was the height the shorter screen no longer has, and truncating a ranked list
+ * is the loss the flag is explicitly allowed to take (§17.13) — where clipping the
+ * bottom of the week silently is not.
  *
  * The cap is expressed twice on purpose and the two agree by construction. Every zone
  * that is handed `mode` slices its own list — that is the version the unit tests
  * exercise and the version that keeps the count in the header honest. This rule is the
- * floor underneath it: the 720px constraint is absolute, so a list that reaches the
+ * floor underneath it: the 600px constraint is absolute, so a list that reaches the
  * board without a mode must still be capped rather than silently overflow the monitor.
  */
-:global([data-display='board']) .list > *:nth-child(n + 4) {
+:global([data-display='board']) .list > *:nth-child(n + 3) {
   display: none;
 }
 
@@ -586,7 +591,7 @@
  * Board density. §10's 4px base is unchanged; board mode simply sits one step down the
  * same scale, exactly as the type scale does. Row separation is still a hairline and
  * the lanes still line up — this buys back the height the 17px type costs, so the
- * rescale is self-funding rather than something the 720px budget has to absorb.
+ * rescale is self-funding rather than something the 600px budget has to absorb.
  */
 :global([data-display='board']) .taskRow,
 :global([data-display='board']) .dueRow,

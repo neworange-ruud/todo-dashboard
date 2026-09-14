@@ -116,9 +116,9 @@ test.describe('landing view', () => {
 })
 
 test.describe('board mode (PRD §17.13)', () => {
-  test.use({ viewport: { width: 1440, height: 720 } })
+  test.use({ viewport: { width: 1600, height: 600 } })
 
-  test('fits 720px without vertical scrolling', async ({ page }) => {
+  test('fits 600px without vertical scrolling', async ({ page }) => {
     await gotoDashboard(page, '?display=board')
     const overflow = await page.evaluate(
       () => document.documentElement.scrollHeight - window.innerHeight,
@@ -127,7 +127,7 @@ test.describe('board mode (PRD §17.13)', () => {
   })
 
   test('is selected by the flag, not the viewport', async ({ page }) => {
-    // Same 1440x720 viewport, no flag -> must NOT be board mode.
+    // Same 1600x600 viewport, no flag -> must NOT be board mode.
     await gotoDashboard(page)
     const el = page.locator('[data-display]').first()
     if (await el.count()) expect(await el.getAttribute('data-display')).toBe('default')

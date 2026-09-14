@@ -13,7 +13,7 @@ export interface ShellProps {
  * A Server Component: presentational only, no data fetching. `display` is
  * read once by app/page.tsx from `searchParams` and passed down as a prop —
  * this component never branches on viewport width to infer it, because a
- * 1440x720 wall monitor is otherwise indistinguishable from a resized
+ * 1600x600 wall monitor is otherwise indistinguishable from a resized
  * laptop window (see the matching comment on `[data-display='board']` in
  * app/globals.css).
  *

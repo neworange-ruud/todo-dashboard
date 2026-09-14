@@ -22,7 +22,7 @@ export default defineConfig({
   use: { baseURL: BASE_URL, trace: 'retain-on-failure' },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'board', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 720 } } },
+    { name: 'board', use: { ...devices['Desktop Chrome'], viewport: { width: 1600, height: 600 } } },
     { name: 'mobile', use: { ...devices['iPhone 14 Pro Max'] } },
   ],
   webServer: {

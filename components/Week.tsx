@@ -28,7 +28,7 @@ export interface WeekProps {
  * Board mode is the one place the §17.5 caps return. Both lists still *say* how long
  * they are in their header, so nothing is hidden — only undrawn (PRD §17.13).
  */
-const BOARD_ROWS = 3
+const BOARD_ROWS = 2
 
 /** See the matching note in `TopFive.tsx`: one line, 2px stripe, content stays (PRD §9). */
 function UnavailableLine({ source, since }: { source: string; since?: string }) {
@@ -78,8 +78,8 @@ function isStarted(state: TaskState): boolean {
  * opposite.
  *
  * Both lists render whole — the `⌄ N more` caps are removed at real volumes (§17.5).
- * Board mode is the single exception: it draws three rows per block and lets the
- * header's named count carry the rest, because 720px is a hard constraint (§17.13).
+ * Board mode is the single exception: it draws two rows per block and lets the
+ * header's named count carry the rest, because 600px is a hard constraint (§17.13).
  */
 export default function Week({
   load,
