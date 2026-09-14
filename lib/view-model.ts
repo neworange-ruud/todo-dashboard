@@ -9,7 +9,7 @@ import { buildAttention } from './domain/attention'
 import { NOMINAL_WORKDAY_MINUTES } from './domain/shape'
 import { matchIssuesToMeetings } from './ai/matching'
 import { startOfLocalDay, toDateKey, weekdaysOf } from './time'
-import { newestStoredAt } from './cache'
+import { newestStoredAtPrefix } from './cache'
 import { STALE_AFTER_MS } from './config'
 import type {
   AttentionItem,
@@ -139,15 +139,26 @@ export async function buildDashboard(
   }
 }
 
+/**
+ * When a source last answered for real.
+ *
+ * Asked by *prefix* rather than by key. The previous form spelled Graph's key as
+ * `graph:day:<today>`, which the calendar fetcher has never written — it writes
+ * `graph:events:day:<key>` — so the marker silently reported Linear's timestamp alone
+ * and Graph could never register as stale. A prefix also survives `?date=`, where the
+ * day actually fetched is not today's.
+ */
 function syncedAt(): string | null {
-  const t = newestStoredAt(['linear:issues', `graph:day:${toDateKey(new Date())}`])
-  return t ? new Date(t).toISOString() : null
+  const times = [newestStoredAtPrefix('linear:'), newestStoredAtPrefix('graph:')].filter(
+    (t): t is number => t !== null,
+  )
+  return times.length ? new Date(Math.max(...times)).toISOString() : null
 }
 
 /** A source that answered but from an old cache is stale, not healthy (PRD §9). */
-function health(prefix: string, fetched: SourceHealth): SourceHealth {
+function health(prefix: 'linear:' | 'graph:', fetched: SourceHealth): SourceHealth {
   if (fetched === 'failed') return 'failed'
-  const t = newestStoredAt([prefix + 'issues', prefix + 'day:' + toDateKey(new Date())])
+  const t = newestStoredAtPrefix(prefix)
   if (t && Date.now() - t > STALE_AFTER_MS) return 'stale'
   return 'ok'
 }

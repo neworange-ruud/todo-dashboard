@@ -99,6 +99,28 @@
   line-height: 1;
 }
 
+/*
+ * "Refreshing: glyph rotates once per second" (PRD §9). The glyph is the only thing that
+ * moves — the data on screen stays live and readable, never blanked and never
+ * skeletonised, so a refresh that finds nothing new is visually a no-op.
+ */
+@keyframes syncSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.syncButton[data-refreshing='true'] .syncGlyph {
+  animation: syncSpin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .syncButton[data-refreshing='true'] .syncGlyph {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 /* ====================================================================== */
 /* Zone 1 — Attention (PRD §9)                                            */
 /* ====================================================================== */
@@ -145,6 +167,43 @@
 /* ====================================================================== */
 /* Zone 2 — Sentence (PRD §4, §10)                                        */
 /* ====================================================================== */
+
+/*
+ * The zone is prose on the left and the wall clock on the right, centred against it.
+ *
+ * The clock is vertically centred rather than baseline-aligned because the prose is one
+ * or two lines depending on the day, and a clock that jumped down a line whenever the
+ * sentence grew would be the only thing on the page that moves for no reason.
+ */
+.sentenceZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.sentenceProse {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/*
+ * The clock (PRD §4, §9).
+ *
+ * One step above the prose beside it, in the same serif and the same light weight, in the
+ * quiet ink — present at a glance from across the room, subordinate to the sentence when
+ * you are actually reading. `tabular-nums` so the minute changing never shifts the hour.
+ */
+.clock {
+  flex: 0 0 auto;
+  font-family: var(--font-serif, ui-serif, Georgia, serif);
+  font-weight: 300;
+  font-size: var(--text-3xl);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
 
 .sentence {
   max-width: 62ch;
@@ -248,6 +307,21 @@
   .sentenceSkeleton {
     font-size: var(--text-xl);
     line-height: 30px;
+  }
+
+  /*
+   * A phone has no room for a column beside 62 characters of prose, so the clock moves
+   * above it — still on the right, still the first thing the eye lands on in the zone.
+   */
+  .sentenceZone {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .clock {
+    align-self: flex-end;
+    font-size: var(--text-2xl);
   }
 }
 

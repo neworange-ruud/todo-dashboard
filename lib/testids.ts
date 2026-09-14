@@ -30,6 +30,8 @@ export const TID = {
   // Sentence (PRD §4)
   sentenceText: 'sentence-text',
   sentenceEntity: 'sentence-entity',
+  /** The wall clock beside the sentence. */
+  clock: 'clock',
 
   // Timeline (PRD §5)
   timeline: 'timeline',

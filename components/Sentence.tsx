@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import Clock from './Clock'
 import { TID, testid } from '@/lib/testids'
 import { withView, type ViewParams } from '@/lib/view-href'
 import { fadeOut, hasSentenceChanged, runOpenCascade, writeInWords } from '@/lib/motion'
@@ -10,6 +11,12 @@ import styles from './zones.module.css'
 export interface SentenceProps {
   /** Board mode and the viewed date, so a click keeps both (see `lib/view-href`). */
   view?: ViewParams
+
+  /**
+   * The instant this render was drawn. Seeds the wall clock beside the prose; omit it
+   * and the zone renders without a clock, which is what the unit tests want.
+   */
+  nowMs?: number
 
   sentence: DailySentence | null
   /**
@@ -125,7 +132,7 @@ function entityHref(entity: SentenceEntity): string {
  * the first sentence has arrived; from then on the last good prose stays on screen and
  * the new one cross-fades into its place.
  */
-export default function Sentence({ sentence, loading = false, view }: SentenceProps) {
+export default function Sentence({ sentence, loading = false, view, nowMs }: SentenceProps) {
   // The sentence currently on screen. Seeded from props so the server and the first
   // client render agree, then held across a refresh that briefly has nothing to offer.
   const [shown, setShown] = useState<DailySentence | null>(sentence)
@@ -200,16 +207,20 @@ export default function Sentence({ sentence, loading = false, view }: SentencePr
   // The skeleton is for the very first paint only — never for a refresh (PRD §9).
   if (shown === null) {
     return (
-      <section {...testid(TID.sentence)}>
-        <div
-          className={styles.sentenceSkeleton}
-          aria-hidden="true"
-          aria-busy={loading ? 'true' : undefined}
-          {...testid(TID.skeleton)}
-        >
-          <span className={styles.skeletonLine} />
-          <span className={styles.skeletonLine} />
+      <section className={styles.sentenceZone} {...testid(TID.sentence)}>
+        <div className={styles.sentenceProse}>
+          <div
+            className={styles.sentenceSkeleton}
+            aria-hidden="true"
+            aria-busy={loading ? 'true' : undefined}
+            {...testid(TID.skeleton)}
+          >
+            <span className={styles.skeletonLine} />
+            <span className={styles.skeletonLine} />
+          </div>
         </div>
+        {/* The clock is not waiting on anything, so it arrives with the frame. */}
+        {nowMs !== undefined && <Clock nowMs={nowMs} />}
       </section>
     )
   }
@@ -217,60 +228,68 @@ export default function Sentence({ sentence, loading = false, view }: SentencePr
   const segments = segmentSentence(shown.text, shown.entities)
 
   return (
-    <section {...testid(TID.sentence)}>
-      <p
-        ref={proseRef}
-        className={`${styles.sentence} voice-written arrive`}
-        data-clamp={expanded ? 'false' : 'true'}
-        {...testid(TID.sentenceText)}
-      >
-        {segments.map((segment, index) => {
-          if (!segment.entity) return <span key={index}>{segment.text}</span>
+    <section className={styles.sentenceZone} {...testid(TID.sentence)}>
+      <div className={styles.sentenceProse}>
+        <p
+          ref={proseRef}
+          className={`${styles.sentence} voice-written arrive`}
+          data-clamp={expanded ? 'false' : 'true'}
+          {...testid(TID.sentenceText)}
+        >
+          {segments.map((segment, index) => {
+            if (!segment.entity) return <span key={index}>{segment.text}</span>
 
-          const entity = segment.entity
-          if (entity.kind === 'timerange') {
+            const entity = segment.entity
+            if (entity.kind === 'timerange') {
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  className={styles.entityButton}
+                  data-entity-kind={entity.kind}
+                  data-ref={entity.ref}
+                  aria-controls="timeline"
+                  {...testid(TID.sentenceEntity)}
+                >
+                  {segment.text}
+                </button>
+              )
+            }
+
             return (
-              <button
+              <a
                 key={index}
-                type="button"
-                className={styles.entityButton}
+                href={withView(entityHref(entity), view)}
+                className={styles.entity}
                 data-entity-kind={entity.kind}
                 data-ref={entity.ref}
-                aria-controls="timeline"
                 {...testid(TID.sentenceEntity)}
               >
                 {segment.text}
-              </button>
+              </a>
             )
-          }
+          })}
+        </p>
 
-          return (
-            <a
-              key={index}
-              href={withView(entityHref(entity), view)}
-              className={styles.entity}
-              data-entity-kind={entity.kind}
-              data-ref={entity.ref}
-              {...testid(TID.sentenceEntity)}
-            >
-              {segment.text}
-            </a>
-          )
-        })}
-      </p>
+        {/* Truncation is never silent. One word, no chevron, no count. */}
+        {(truncated || expanded) && (
+          <button
+            type="button"
+            className={styles.sentenceMore}
+            aria-expanded={expanded ? 'true' : 'false'}
+            onClick={() => setExpanded((open) => !open)}
+            data-testid="sentence-more"
+          >
+            {expanded ? 'less' : 'more'}
+          </button>
+        )}
+      </div>
 
-      {/* Truncation is never silent. One word, no chevron, no count. */}
-      {(truncated || expanded) && (
-        <button
-          type="button"
-          className={styles.sentenceMore}
-          aria-expanded={expanded ? 'true' : 'false'}
-          onClick={() => setExpanded((open) => !open)}
-          data-testid="sentence-more"
-        >
-          {expanded ? 'less' : 'more'}
-        </button>
-      )}
+      {/*
+        Right of the prose and centred against it, so the two read as one statement:
+        what is true, and when it was true.
+      */}
+      {nowMs !== undefined && <Clock nowMs={nowMs} />}
     </section>
   )
 }

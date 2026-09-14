@@ -10,7 +10,7 @@ import DrillPanel from '@/components/DrillPanel'
 import { buildDashboard } from '@/lib/view-model'
 import { generateSentence } from '@/lib/ai/sentence'
 import { addDays, resolveViewDate, startOfLocalDay } from '@/lib/time'
-import { TIMEZONE } from '@/lib/config'
+import { POLL_MS, TIMEZONE } from '@/lib/config'
 import type { DisplayMode } from '@/lib/types'
 
 /**
@@ -68,7 +68,10 @@ export default async function Page({
   // resolves to today rather than erroring — see `resolveViewDate`.
   const view = resolveViewDate(dateParam)
 
-  const model = await buildDashboard(display, new Date(), view.key)
+  // One instant for the whole render, threaded down to the two components that show it.
+  // Reading the clock twice would let the bar and the sentence disagree by a minute.
+  const renderedAt = new Date()
+  const model = await buildDashboard(display, renderedAt, view.key)
 
   // Carried into every link the zones write, so opening a drill-in from a preview of
   // Monday does not drop the dashboard back onto today behind the panel.
@@ -82,9 +85,17 @@ export default async function Page({
 
   return (
     <Shell display={display}>
+      {/*
+        The bar's marker polls: it re-runs this Server Component on an interval so a page
+        left open does not keep asserting a finished meeting and a closed task (PRD §9,
+        §15.3). `router.refresh()` re-renders rather than remounting, so the open cascade
+        does not replay and an open drill-in survives the poll (§17.13).
+      */}
       <Bar
         dateLabel={formatDateLabel(model.todayKey)}
         sync={model.sync}
+        nowMs={renderedAt.getTime()}
+        pollMs={POLL_MS}
         isToday={model.isToday}
         nav={{
           previous: href(display, addDays(model.todayKey, -1)),
@@ -96,7 +107,12 @@ export default async function Page({
       {/* Zone 1 renders nothing at all when nothing qualifies — zero height, not collapsed. */}
       <Attention items={model.attention} view={viewParams} />
 
-      <Sentence sentence={sentence} loading={sentence === null} view={viewParams} />
+      <Sentence
+        sentence={sentence}
+        loading={sentence === null}
+        view={viewParams}
+        nowMs={renderedAt.getTime()}
+      />
 
       <Horizons
         today={

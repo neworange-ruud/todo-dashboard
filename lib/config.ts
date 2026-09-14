@@ -1,10 +1,10 @@
 import 'server-only'
 import { z } from 'zod'
-import { TIMEZONE, LINEAR_TEAM_KEY, STALE_AFTER_MS } from './constants'
+import { TIMEZONE, LINEAR_TEAM_KEY, STALE_AFTER_MS, POLL_MS, CLOCK_TICK_MS } from './constants'
 
 // Re-exported so existing server-side imports keep working. Client Components must
 // import these from './constants' directly — this module is server-only.
-export { TIMEZONE, LINEAR_TEAM_KEY, STALE_AFTER_MS }
+export { TIMEZONE, LINEAR_TEAM_KEY, STALE_AFTER_MS, POLL_MS, CLOCK_TICK_MS }
 
 /**
  * Configuration and environment validation.

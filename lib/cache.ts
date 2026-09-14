@@ -67,6 +67,23 @@ export function newestStoredAt(keys: string[]): number | null {
   return times.length ? Math.max(...times) : null
 }
 
+/**
+ * Most recent successful write under `prefix`.
+ *
+ * The sync marker asks about a *source*, not about one key: Graph writes a different
+ * entry per day and per week range, and with `?date=` in play the day that was actually
+ * fetched is not today's. Naming the family rather than enumerating it is what keeps the
+ * marker honest when the question moves.
+ */
+export function newestStoredAtPrefix(prefix: string): number | null {
+  let newest: number | null = null
+  for (const [key, entry] of store) {
+    if (!key.startsWith(prefix)) continue
+    if (newest === null || entry.storedAt > newest) newest = entry.storedAt
+  }
+  return newest
+}
+
 export function invalidate(prefix?: string): void {
   if (!prefix) return store.clear()
   for (const key of store.keys()) if (key.startsWith(prefix)) store.delete(key)

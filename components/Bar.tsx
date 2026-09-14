@@ -1,7 +1,6 @@
-import { STALE_AFTER_MS } from '@/lib/config'
 import { TID, testid } from '@/lib/testids'
-import { formatRelative } from '@/lib/time'
 import type { SyncState } from '@/lib/types'
+import SyncMarker from './SyncMarker'
 import ThemeToggle from './ThemeToggle'
 import styles from './zones.module.css'
 
@@ -17,9 +16,14 @@ export interface BarProps {
   dateLabel: string
   sync: SyncState
   /**
-   * Optional handler for the sync marker. Only ever supplied by a client parent;
-   * without it the marker is still a real button, it just has nothing to do yet.
+   * The instant this render was drawn, threaded to the marker so its relative label
+   * hydrates to the same words the server wrote. Passed in rather than read here: a
+   * component that reads the clock while rendering has no stable answer to give.
    */
+  nowMs: number
+  /** Interval between automatic refreshes, in ms. 0 turns polling off. */
+  pollMs?: number
+  /** Test seam: called instead of refreshing the route. */
   onRefresh?: () => void
   /** False when a date override is showing another day (PRD §17.14). */
   isToday?: boolean
@@ -39,30 +43,15 @@ export interface BarProps {
  * deliberately not folded in here — a single unreachable source is reported as an
  * inline line inside the zone it affects, so that the bar keeps meaning one thing.
  */
-/**
- * Reads the clock once and answers both questions from the same instant, so the label
- * and the hue can never disagree. On the server this is request time; there is no
- * hydration to mismatch, because the bar is rendered on the server.
- */
-function readSync(lastSyncedAt: string | null): { marker: string; isStale: boolean } {
-  if (!lastSyncedAt) return { marker: 'Never synced', isStale: true }
-  const now = new Date()
-  const syncedAt = new Date(lastSyncedAt)
-  return {
-    marker: `Synced ${formatRelative(syncedAt, now)}`,
-    isStale: now.getTime() - syncedAt.getTime() > STALE_AFTER_MS,
-  }
-}
-
 export default function Bar({
   dateLabel,
   sync,
+  nowMs,
+  pollMs,
   onRefresh,
   isToday = true,
   nav,
 }: BarProps) {
-  const { marker, isStale } = readSync(sync.lastSyncedAt)
-
   return (
     <header
       className={styles.bar}
@@ -119,21 +108,12 @@ export default function Bar({
       <div className={styles.barControls}>
         <ThemeToggle />
 
-        <button
-          type="button"
-          className={styles.syncButton}
-          data-stale={isStale ? 'true' : 'false'}
-          onClick={onRefresh}
-          aria-label={`${marker}. Refresh now.`}
-          {...testid(TID.refreshButton)}
-        >
-          <span className={styles.syncGlyph} aria-hidden="true">
-            ↻
-          </span>
-          <span className="num" {...testid(TID.syncMarker)}>
-            {marker}
-          </span>
-        </button>
+        <SyncMarker
+          lastSyncedAt={sync.lastSyncedAt}
+          nowMs={nowMs}
+          {...(pollMs === undefined ? {} : { pollMs })}
+          {...(onRefresh ? { onRefresh } : {})}
+        />
       </div>
     </header>
   )

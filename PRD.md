@@ -138,6 +138,21 @@ blue.
 | Time range | Scrolls and highlights that band in the timeline. No panel. |
 | Account | CRM account drill-in |
 
+### The clock beside it
+
+Right of the prose and vertically centred against it, in the same serif one step larger, in the
+quiet ink: `16:13`. Hours and minutes, fixed to Europe/Amsterdam like everything else, ticking on
+the minute boundary.
+
+The sentence is written entirely in terms of *now* — "the afternoon has only a narrow working
+window", "already late", "the last meeting" — and without a clock beside it the reader has to
+supply that instant themselves and trust that the page and their own sense of the time agree. It
+is also the fastest way to catch a page that has stopped refreshing: the prose can be quietly
+wrong and still read fine, but a clock stuck at 15:42 is unmistakable from across the room.
+
+No seconds. Nothing on this page changes in under a minute, and a second hand would be the only
+element demanding continuous attention.
+
 ### Time of day
 
 | Window | What the sentence does | Example opening |
@@ -425,8 +440,10 @@ broken page.
 
 | State | Behaviour |
 |---|---|
-| Last synced | Always visible in the bar, mono 11px: `↻ Synced 2m ago`. It is a button. |
+| Last synced | Always visible in the bar, mono 11px: `↻ Synced 2m ago`. It is a button, and it ages on its own between refreshes. |
+| Polling | **Both modes poll, once a minute.** A page rendered once and left open is the only way this product can actively mislead — a finished meeting still on the timeline, a closed task still ranked first, and the bar insisting it synced just now. A hidden tab does not poll and catches up when it returns. |
 | Refreshing | Glyph rotates once per second. Data on screen stays live and readable — never blanked, never skeletonised. Changed values cross-fade in place. |
+| Pressing the marker | Drops the `linear:` and `graph:` caches before re-rendering, so "refresh" means a real round trip rather than the same cached response under a fresh claim. The AI caches are left alone; they key on an input hash and regenerate themselves. |
 | Stale > 15 min | Marker shifts to the warning hue. Nothing else changes. |
 | Source down | Affected zone shows an inline line — "Linear unreachable · showing data from 08:12 · Retry" — and keeps rendering cached data behind it. Other zones untouched. |
 | Offline | Everything renders from cache with a single bar-level notice. The product stays readable offline; it was never interactive anyway. |
@@ -680,7 +697,13 @@ cannot guarantee.
 - **The daily sentence** is generated on a schedule (roughly every 15 minutes, plus on each of the
   three time-window boundaries in §4) so it is always warm when the page opens, and regenerated
   when the underlying data hash changes.
-- **Wall monitor** polls on an interval and re-renders. No SSE or websocket.
+- **Both modes poll** once a minute and re-render in place, via `router.refresh()` — a render,
+  not a remount, so the open cascade does not replay and an open drill-in survives the poll. No SSE
+  or websocket. The poll does not clear the caches above; the TTLs still decide how often a source
+  is actually called, so a monitor left on all day makes roughly one Linear request a minute.
+  Polling was originally specified for the wall monitor alone, on the theory that a desktop reader
+  refreshes by habit. They do not — a laptop left open across an afternoon went just as stale, and
+  the failure is worse there because a desktop reader trusts what they are looking at.
 
 ### 15.4 Time
 
@@ -967,7 +990,7 @@ component branches on viewport width to decide it.
 | Timeline | Whole day; past events dimmed and kept | **Now onward only** — past events removed, not collapsed |
 | List length | Everything (§17.5) | **Top two per block**, remainder as a named count in the header |
 | Must fit without scrolling | No | **Yes.** 600px is the hard constraint. |
-| Refresh | On load, plus manual | **Polls on an interval** and re-renders in place |
+| Refresh | Polls on an interval, plus manual | Polls on an interval, plus manual |
 | Open cascade (§11) | Once per session | Once on first paint only — **never on a poll refresh** |
 
 **Rules that hold in both modes:**

@@ -18,3 +18,18 @@ export const STALE_AFTER_MS = 15 * 60_000
 
 /** Presentation profile query flag (PRD §17.13). */
 export const BOARD_QUERY_VALUE = 'board' as const
+
+/**
+ * How often the page re-reads its sources (PRD §9, §15.3).
+ *
+ * The dashboard is a live reading of systems that change while nobody is looking at it,
+ * so leaving it on the render it was born with is the one failure mode it cannot be
+ * allowed to have: a meeting that has finished, or a task that has been closed, must
+ * not still be on screen. One minute is the shortest interval the source TTLs can
+ * actually honour — Linear is cached for 60s and Graph for 120s — so polling faster
+ * would only redraw the same numbers.
+ */
+export const POLL_MS = 60_000
+
+/** How often the *relative* labels ("Synced 2m ago") are recomputed between polls. */
+export const CLOCK_TICK_MS = 30_000

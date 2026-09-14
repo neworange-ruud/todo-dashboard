@@ -72,6 +72,38 @@ test.describe('landing view', () => {
     expect(text).not.toMatch(/\bRuud\b/)
   })
 
+  test('the clock states the instant the sentence is talking about (PRD §4)', async ({ page }) => {
+    await gotoDashboard(page)
+
+    const clock = page.locator(t(TID.clock)).first()
+    await expect(clock).toBeVisible()
+    await expect(clock).toHaveText(/^([01]\d|2[0-3]):[0-5]\d$/)
+
+    // Beside the prose and larger than it, not a caption under it.
+    const prose = await page.locator(t(TID.sentenceText)).first().boundingBox()
+    const box = await clock.boundingBox()
+    expect(prose && box).toBeTruthy()
+    if (!prose || !box) return
+
+    const stacked = page.viewportSize()!.width < 768
+    if (stacked) {
+      // On a phone it moves above the prose, still hard against the right edge.
+      expect(box.y).toBeLessThan(prose.y)
+      expect(box.x + box.width).toBeGreaterThan(prose.x + prose.width * 0.8)
+    } else {
+      expect(box.x).toBeGreaterThan(prose.x + prose.width)
+      // Centred against the prose rather than pinned to a line of it.
+      expect(Math.abs(box.y + box.height / 2 - (prose.y + prose.height / 2))).toBeLessThan(24)
+    }
+
+    const size = await clock.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    const proseSize = await page
+      .locator(t(TID.sentenceText))
+      .first()
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(size).toBeGreaterThan(proseSize)
+  })
+
   test('every ranked task carries a reason line (PRD §6)', async ({ page }) => {
     await gotoDashboard(page)
     const rows = page.locator(t(TID.taskRow))
