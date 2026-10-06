@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081425">
+  <title>Buddy</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #eef6ff;
+      --muted: #a3b6cc;
+      --cyan: #4cd8ff;
+      --panel: rgba(13, 33, 55, .78);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 76% 36%, rgba(28, 102, 144, .34), transparent 33rem),
+        radial-gradient(circle at 15% 84%, rgba(14, 81, 121, .22), transparent 30rem),
+        #081425;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .15;
+      background-image: linear-gradient(#b7e9ff 1px, transparent 1px), linear-gradient(90deg, #b7e9ff 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, transparent, black 25%, transparent);
+    }
+
+    .shell {
+      position: relative;
+      width: min(100% - 40px, 1150px);
+      margin-inline: auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 28px 0;
+      border-bottom: 1px solid rgba(184, 225, 255, .13);
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; letter-spacing: -.03em; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      color: #071724;
+      background: var(--cyan);
+      box-shadow: 0 0 24px rgba(76, 216, 255, .3);
+      font-size: 22px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid rgba(76, 216, 255, .28);
+      border-radius: 999px;
+      color: #bcefff;
+      background: rgba(35, 122, 157, .12);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 490px);
+      align-items: center;
+      gap: clamp(32px, 7vw, 100px);
+      min-height: calc(100vh - 91px);
+      padding: 44px 0 64px;
+    }
+
+    .eyebrow { margin: 0 0 18px; color: var(--cyan); font-size: 12px; font-weight: 750; letter-spacing: .2em; text-transform: uppercase; }
+    h1 { max-width: 570px; margin: 0; font-size: clamp(44px, 6.7vw, 79px); line-height: .99; letter-spacing: -.067em; }
+    h1 span { color: var(--cyan); }
+    .lead { max-width: 440px; margin: 26px 0 34px; color: var(--muted); font-size: 17px; line-height: 1.65; }
+
+    .controls {
+      width: min(100%, 425px);
+      padding: 22px;
+      border: 1px solid rgba(170, 219, 255, .15);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .16);
+      backdrop-filter: blur(16px);
+    }
+
+    .control-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .control-title { margin: 0; font-size: 14px; font-weight: 700; }
+    .control-note { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: #b6ebff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); }
+    .range-row { display: flex; align-items: center; gap: 14px; margin-top: 24px; }
+    .range-row label { flex: 0 0 auto; color: #d7e8f7; font-size: 12px; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); cursor: pointer; }
+    output { width: 32px; text-align: right; color: var(--cyan); font-variant-numeric: tabular-nums; font-size: 12px; }
+    button {
+      margin-top: 18px;
+      padding: 10px 14px;
+      color: #e8f8ff;
+      background: rgba(76, 216, 255, .08);
+      border: 1px solid rgba(76, 216, 255, .27);
+      border-radius: 10px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover, button:focus-visible { background: rgba(76, 216, 255, .17); outline: 2px solid transparent; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+    .stage {
+      position: relative;
+      width: min(100%, 490px);
+      margin-inline: auto;
+      padding: 14px;
+      border: 1px solid rgba(105, 203, 255, .28);
+      border-radius: 29px;
+      background: linear-gradient(145deg, rgba(75, 170, 217, .14), rgba(10, 30, 51, .7) 44%);
+      box-shadow: 0 25px 85px rgba(0, 0, 0, .32), 0 0 80px rgba(38, 156, 207, .1);
+    }
+
+    .display-stack { width: min(100%, 490px); margin-inline: auto; }
+    .main-display {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 105px;
+      margin-bottom: 17px;
+      padding: 20px 24px;
+      border: 1px solid rgba(160, 218, 255, .27);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(30, 77, 108, .8), rgba(8, 25, 44, .9));
+      box-shadow: 0 16px 50px rgba(0, 0, 0, .19);
+    }
+    .main-display strong { display: block; margin-bottom: 6px; font-size: 13px; }
+    .main-display span { color: var(--muted); font-size: 11px; }
+    .main-display .cursor-hint { color: var(--cyan); font-size: 13px; font-weight: 700; white-space: nowrap; }
+
+    .portrait-wrap { position: relative; overflow: hidden; aspect-ratio: 1145 / 1374; border-radius: 18px; background: #07162b; }
+    .pose-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; transition: opacity .32s ease-in-out; }
+    .pose-canvas[data-active="true"] { opacity: 1; }
+    .main-display[data-active="true"] { border-color: rgba(76, 216, 255, .7); box-shadow: 0 0 28px rgba(76, 216, 255, .13); }
+    .stage[data-pose="buddy"] { border-color: rgba(76, 216, 255, .7); }
+    .stage-caption {
+      position: absolute;
+      right: 26px;
+      bottom: 29px;
+      left: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid rgba(194, 232, 255, .17);
+      border-radius: 12px;
+      background: rgba(6, 20, 35, .76);
+      backdrop-filter: blur(14px);
+      font-size: 12px;
+    }
+    .stage-caption strong { font-size: 13px; }
+    .stage-caption span { color: #8eddf7; }
+
+    @media (max-width: 800px) {
+      header { padding: 19px 0; }
+      main { grid-template-columns: 1fr; gap: 32px; padding-top: 42px; }
+      .intro { max-width: 620px; }
+      .stage { max-width: 440px; }
+    }
+    @media (max-width: 480px) {
+      .shell { width: min(100% - 28px, 1150px); }
+      .badge { font-size: 9px; }
+      h1 { font-size: 49px; }
+      .lead { font-size: 15px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pose-canvas { transition: none; }
+    }
+
+    /* 1600×600 companion screen: the portrait stays centred, with less torso. */
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body { min-height: 0; background: linear-gradient(#071f38, #061a30 48%, #0e121a); }
+    body::before { display: none; }
+    .shell, main, .display-stack, .stage {
+      width: 100%; height: 100%; min-height: 0; max-width: none;
+      margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+    }
+    .shell { position: fixed; inset: 0; }
+    header, .intro, .main-display, .stage-caption { display: none; }
+    main { display: block; }
+    .stage { position: relative; overflow: hidden; background: linear-gradient(#071f38, #061a30 48%, #0e121a); }
+    .portrait-wrap {
+      position: absolute; top: -12px; left: 50%;
+      width: min(730px, 100vw); height: 880px; max-width: none;
+      margin: 0; border: 0; border-radius: 0; aspect-ratio: auto;
+      transform: translateX(-50%);
+      mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+      background: transparent;
+    }
+    .pose-canvas { width: 100%; height: auto; }
+    .calendar {
+      position: absolute; z-index: 2; top: 66px; bottom: 66px; left: 48px;
+      width: 355px; display: flex; flex-direction: column; padding: 25px 25px 19px;
+      overflow: hidden; border: 1px solid rgba(135, 202, 235, .22);
+      border-radius: 18px; background: rgba(5, 20, 39, .82);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .2);
+      backdrop-filter: blur(22px);
+    }
+    .calendar-kicker { margin: 0 0 8px; color: #74d5f4; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .calendar-heading { margin: 0 0 20px; font-size: 28px; line-height: 1; letter-spacing: -.045em; font-weight: 650; }
+    .calendar-list { overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: #345368 transparent; }
+    .calendar-row { display: grid; grid-template-columns: 76px 1fr; gap: 13px; padding: 15px 0; border-top: 1px solid rgba(174, 215, 241, .12); }
+    .calendar-time { padding-top: 2px; color: #83d9f1; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .calendar-time.now { color: #f0d4a3; }
+    .calendar-title { margin: 0; font-size: 14px; line-height: 1.35; font-weight: 620; overflow-wrap: anywhere; }
+    .calendar-detail { margin: 5px 0 0; color: #a3b6cc; font-size: 11px; line-height: 1.35; }
+    .calendar-empty { border-top: 1px solid rgba(174, 215, 241, .12); padding-top: 20px; color: #a3b6cc; font-size: 13px; line-height: 1.5; }
+    .calendar-foot { margin: 14px 0 0; color: #829ab0; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .conversation {
+      position: absolute; z-index: 2; top: 66px; bottom: 66px; right: 48px;
+      width: 355px; display: flex; flex-direction: column; padding: 25px;
+      border: 1px solid rgba(135, 202, 235, .22); border-radius: 18px;
+      background: rgba(5, 20, 39, .82); backdrop-filter: blur(22px);
+    }
+    .conversation-log { flex: 1; min-height: 0; overflow-y: auto; margin: 0 0 12px; scrollbar-width: thin; }
+    .conversation-entry { margin: 0 0 14px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .conversation-entry strong { display: block; margin-bottom: 3px; color: #83d9f1; font-size: 11px; }
+    .conversation-feedback { display: flex; align-items: center; gap: 8px; min-height: 39px; }
+    .conversation-status { flex: 1; color: #a3b6cc; font-size: 11px; line-height: 1.4; }
+    .conversation-progress { flex: 0 0 auto; width: 13px; height: 13px; border: 2px solid #345368; border-top-color: var(--cyan); border-radius: 50%; animation: buddy-spin .8s linear infinite; }
+    .conversation-progress[hidden], #conversation-cancel[hidden] { display: none; }
+    #conversation-cancel { margin: 0; padding: 7px 9px; }
+    #conversation-cancel:disabled { opacity: .6; cursor: default; }
+    @keyframes buddy-spin { to { transform: rotate(360deg); } }
+    .conversation-form { display: flex; gap: 7px; }
+    .conversation-form input {
+      min-width: 0; flex: 1; padding: 10px; color: #eef6ff; background: #0c2943;
+      border: 1px solid rgba(135, 202, 235, .3); border-radius: 9px; font: inherit; font-size: 12px;
+    }
+    .conversation-form button { margin: 0; min-width: 42px; padding: 9px; }
+    #mic { min-width: 91px; touch-action: none; user-select: none; }
+    #mic[data-sticky="true"] { color: #ffb9a4; border-color: #ffb9a4; background: rgba(190, 61, 43, .23); }
+    .conversation-form button:disabled { opacity: .5; cursor: default; }
+    @media (prefers-reduced-motion: reduce) { .conversation-progress { animation: none; } }
+    @media (max-width: 1000px) {
+      .calendar { left: 18px; width: min(320px, 35vw); }
+      .conversation { right: 18px; width: min(320px, 35vw); }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>Buddy</span></div>
+      <span class="badge">Companion display</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="headline">
+        <p class="eyebrow">Designed for the screen below yours</p>
+        <h1 id="headline">Six directions. <span>One Buddy.</span></h1>
+        <p class="lead">Move across either display. Its left, middle, and right thirds turn Buddy’s whole face toward your pointer. His eyes keep following it within each pose.</p>
+
+        <div class="controls">
+          <div class="control-top">
+            <div><p class="control-title">Eye tracking</p><p class="control-note">Left, middle, right on both displays.</p></div>
+            <span class="status" id="status">Looking up</span>
+          </div>
+          <div class="range-row">
+            <label for="strength">Strength</label>
+            <input id="strength" type="range" min="0" max="100" value="70">
+            <output id="strength-value" for="strength">70%</output>
+          </div>
+          <button id="center" type="button">Return to up-center pose</button>
+        </div>
+      </section>
+
+      <div class="display-stack">
+        <div class="main-display" id="main-display" aria-label="Main display pointer area">
+          <div><strong>Main display</strong><span>Imagine your work here</span></div>
+          <span class="cursor-hint">Left · Up · Right</span>
+        </div>
+        <section class="stage" id="buddy-display" data-pose="main" aria-label="Companion display with interactive assistant portrait">
+          <div class="portrait-wrap" id="portrait-wrap" role="img" aria-label="Buddy looking upward and tracking the pointer"></div>
+          <section class="calendar" aria-labelledby="calendar-heading">
+            <p class="calendar-kicker" id="calendar-date">Today</p>
+            <h2 class="calendar-heading" id="calendar-heading">Up next</h2>
+            <div class="calendar-list" id="calendar-list" role="list" aria-live="polite"></div>
+            <p class="calendar-foot" id="calendar-foot">Checking Outlook…</p>
+          </section>
+          <section class="conversation" aria-labelledby="conversation-heading">
+            <p class="calendar-kicker">Conversation</p>
+            <h2 class="calendar-heading" id="conversation-heading">Talk to Buddy</h2>
+            <div class="conversation-log" id="conversation-log" role="log" aria-live="polite"></div>
+            <div class="conversation-feedback">
+              <span class="conversation-progress" id="conversation-progress" role="progressbar" aria-label="Buddy is working" hidden></span>
+              <div class="conversation-status" id="conversation-status" role="status">Connecting…</div>
+              <button type="button" id="conversation-cancel" hidden>Cancel</button>
+            </div>
+            <form class="conversation-form" id="conversation-form">
+              <input id="conversation-input" type="text" placeholder="Ask Buddy…" aria-label="Message Buddy">
+              <button type="submit" id="conversation-send" aria-label="Send message">Send</button>
+              <button type="button" id="mic" aria-label="Hold to talk" title="Hold to talk; hold longer to lock recording">🎙 Hold</button>
+            </form>
+          </section>
+          <div class="stage-caption"><strong>Buddy display</strong><span>Left · Straight · Right</span></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+(() => {
+  const portraitWrap = document.getElementById('portrait-wrap');
+  const mainDisplay = document.getElementById('main-display');
+  const buddyDisplay = document.getElementById('buddy-display');
+  const strengthInput = document.getElementById('strength');
+  const strengthValue = document.getElementById('strength-value');
+  const status = document.getElementById('status');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const poseNames = ['main-left', 'main-center', 'main-right', 'buddy-left', 'buddy-center', 'buddy-right'];
+  const directions = ['left', 'center', 'right'];
+  const calendarDate = document.getElementById('calendar-date');
+  const calendarList = document.getElementById('calendar-list');
+  const calendarFoot = document.getElementById('calendar-foot');
+  const conversationLog = document.getElementById('conversation-log');
+  const conversationStatus = document.getElementById('conversation-status');
+  const conversationForm = document.getElementById('conversation-form');
+  const conversationInput = document.getElementById('conversation-input');
+  const conversationSend = document.getElementById('conversation-send');
+  const micButton = document.getElementById('mic');
+  const cancelButton = document.getElementById('conversation-cancel');
+  const progress = document.getElementById('conversation-progress');
+  const native = window.webkit?.messageHandlers?.buddy;
+  let conversationPhase = 'idle';
+  let heldPointer = null;
+  let sticky = false;
+  let longPressTimer = null;
+  let suppressClick = false;
+  const postAction = action => native?.postMessage({ action });
+  function renderConversationControls() {
+    const idle = conversationPhase === 'idle';
+    const recording = conversationPhase === 'starting' || conversationPhase === 'recording';
+    const working = !idle && conversationPhase !== 'recording';
+    conversationInput.disabled = !idle;
+    conversationSend.disabled = !idle;
+    micButton.disabled = !idle && !recording;
+    micButton.dataset.sticky = String(sticky && recording);
+    micButton.textContent = sticky && recording ? 'Stop' : idle ? '🎙 Hold' : 'Release';
+    micButton.setAttribute('aria-label', sticky && recording ? 'Stop recording and send' : 'Hold to talk');
+    cancelButton.hidden = idle;
+    cancelButton.disabled = conversationPhase === 'cancelling';
+    progress.hidden = !working;
+  }
+  conversationForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const text = conversationInput.value.trim();
+    if (!text || !native || conversationSend.disabled) return;
+    conversationPhase = 'hermes';
+    renderConversationControls();
+    native.postMessage({ action: 'send', text });
+    conversationInput.value = '';
+  });
+  micButton.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || conversationPhase !== 'idle' || !native) return;
+    heldPointer = event.pointerId;
+    sticky = false;
+    micButton.setPointerCapture(event.pointerId);
+    conversationPhase = 'starting';
+    renderConversationControls();
+    postAction('micStart');
+    longPressTimer = setTimeout(() => {
+      if (heldPointer === event.pointerId) {
+        sticky = true;
+        renderConversationControls();
+      }
+    }, 650);
+  });
+  micButton.addEventListener('pointerup', event => {
+    if (heldPointer !== event.pointerId) return;
+    clearTimeout(longPressTimer);
+    heldPointer = null;
+    suppressClick = true;
+    if (!sticky) {
+      conversationPhase = 'transcribing';
+      postAction('micStop');
+    }
+    renderConversationControls();
+  });
+  micButton.addEventListener('pointercancel', event => {
+    if (heldPointer !== event.pointerId) return;
+    clearTimeout(longPressTimer);
+    heldPointer = null;
+    postAction('cancel');
+  });
+  micButton.addEventListener('click', event => {
+    if (suppressClick) { suppressClick = false; return; }
+    if (event.detail !== 0 && !sticky) return;
+    if (conversationPhase === 'idle') {
+      sticky = true;
+      conversationPhase = 'starting';
+      renderConversationControls();
+      postAction('micStart');
+    } else if (sticky && (conversationPhase === 'starting' || conversationPhase === 'recording')) {
+      conversationPhase = 'transcribing';
+      renderConversationControls();
+      postAction('micStop');
+    }
+  });
+  cancelButton.addEventListener('click', () => {
+    if (conversationPhase === 'idle' || conversationPhase === 'cancelling') return;
+    conversationPhase = 'cancelling';
+    renderConversationControls();
+    postAction('cancel');
+  });
+  window.buddySetConversation = payload => {
+    if (payload.status !== undefined) conversationStatus.textContent = payload.status;
+    if (payload.speaker && payload.text) {
+      const entry = document.createElement('p');
+      entry.className = 'conversation-entry';
+      const name = document.createElement('strong');
+      name.textContent = payload.speaker;
+      entry.append(name, document.createTextNode(payload.text));
+      conversationLog.append(entry);
+      conversationLog.scrollTop = conversationLog.scrollHeight;
+    }
+    if (payload.phase !== undefined) {
+      conversationPhase = payload.phase;
+      if (conversationPhase === 'idle') {
+        clearTimeout(longPressTimer);
+        heldPointer = null;
+        sticky = false;
+      }
+      renderConversationControls();
+    }
+  };
+  renderConversationControls();
+  const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const dayLabel = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long' });
+  let calendarState = { status: 'loading', meetings: [] };
+
+  function renderCalendar() {
+    const now = Date.now();
+    calendarDate.textContent = dayLabel.format(new Date(now));
+    calendarList.replaceChildren();
+    if (calendarState.status !== 'ok') {
+      const empty = document.createElement('p');
+      empty.className = 'calendar-empty';
+      empty.textContent = calendarState.status === 'loading' ? 'Checking today’s calendar…' : calendarState.message;
+      calendarList.append(empty);
+      calendarFoot.textContent = calendarState.status === 'loading' ? 'Checking Outlook…' : 'Calendar unavailable';
+      return;
+    }
+    const upcoming = calendarState.meetings.filter(meeting => meeting.endMs > now);
+    if (upcoming.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'calendar-empty';
+      empty.textContent = 'No more meetings today.';
+      calendarList.append(empty);
+    }
+    for (const meeting of upcoming) {
+      const row = document.createElement('div');
+      row.className = 'calendar-row';
+      row.setAttribute('role', 'listitem');
+      const time = document.createElement('span');
+      time.className = 'calendar-time' + (meeting.startMs <= now ? ' now' : '');
+      time.textContent = meeting.startMs <= now ? 'NOW' : clock.format(new Date(meeting.startMs));
+      const content = document.createElement('div');
+      const title = document.createElement('p');
+      title.className = 'calendar-title';
+      title.textContent = meeting.subject;
+      const detail = document.createElement('p');
+      detail.className = 'calendar-detail';
+      detail.textContent = 'Until ' + clock.format(new Date(meeting.endMs)) +
+        (meeting.location ? ' · ' + meeting.location : '');
+      content.append(title, detail);
+      row.append(time, content);
+      calendarList.append(row);
+    }
+    calendarFoot.textContent = upcoming.length === 1 ? '1 meeting remaining' : `${upcoming.length} meetings remaining`;
+  }
+
+  window.buddySetCalendar = payload => {
+    calendarState = payload;
+    renderCalendar();
+  };
+  renderCalendar();
+  setInterval(renderCalendar, 30_000);
+  const labels = {
+    'main-left': 'Up-left',
+    'main-center': 'Looking up',
+    'main-right': 'Up-right',
+    'buddy-left': 'Looking left',
+    'buddy-center': 'Facing you',
+    'buddy-right': 'Looking right'
+  };
+
+  const imagePaths = [
+    'portrait-main-left-base.png', 'iris-main-left-left.png', 'iris-main-left-right.png',
+    'portrait-base.png', 'iris-left.png', 'iris-right.png',
+    'portrait-main-right-base.png', 'iris-main-right-left.png', 'iris-main-right-right.png',
+    'portrait-buddy-left-base.png', 'iris-buddy-left-left.png', 'iris-buddy-left-right.png',
+    'portrait-straight-base.png', 'iris-straight-left.png', 'iris-straight-right.png',
+    'portrait-buddy-right-base.png', 'iris-buddy-right-left.png', 'iris-buddy-right-right.png'
+  ];
+  const images = imagePaths.map(src => {
+    const image = new Image();
+    image.src = src;
+    return image;
+  });
+
+  const generatedEyes = {"main-left":[{"x":369.7,"y":421.5,"w":45,"h":45,"outline":[407,423,404,433,346,436,337,432,337,424,344,411,358,404,379,405,388,409]},{"x":593.6,"y":428.9,"w":47,"h":47,"outline":[639,435,639,438,616,444,583,444,556,439,554,432,555,427,567,415,579,411,600,411,611,413]}],"main-right":[{"x":543.1,"y":424.2,"w":47,"h":47,"outline":[587,434,557,442,518,441,499,435,500,427,519,411,539,404,560,404,575,412,582,419]},{"x":764.9,"y":412.6,"w":45,"h":45,"outline":[800,422,792,426,769,431,759,431,732,426,728,419,728,412,750,397,762,394,779,394,796,405]}],"buddy-left":[{"x":379.1,"y":489.6,"w":49,"h":47,"outline":[340,485,359,472,381,471,395,474,409,482,422,497,422,501,419,503,390,506,362,505,345,498,340,492]},{"x":614.6,"y":498.5,"w":49,"h":47,"outline":[658,500,658,505,642,513,612,516,586,512,576,508,575,494,579,488,593,482,602,480,620,480,641,486,654,494]}],"buddy-right":[{"x":538.8,"y":481.5,"w":49,"h":47,"outline":[579,479,579,487,574,493,552,497,518,496,503,491,494,485,494,483,504,474,521,466,536,462,563,468,576,475]},{"x":766.9,"y":485.7,"w":49,"h":47,"outline":[807,489,802,495,791,500,762,501,731,496,727,492,726,484,728,481,746,472,759,469,776,469,797,475,804,481]}]};
+  const mainCenterEyes = [
+    { x: 449, y: 429, w: 51, h: 49, path: [394, 436, 408, 414, 427, 407, 450, 408, 473, 408, 493, 419, 507, 436, 490, 447, 470, 452, 449, 452, 425, 453, 407, 447, 394, 436] },
+    { x: 693, y: 422, w: 51, h: 49, path: [633, 435, 651, 411, 673, 404, 695, 403, 716, 404, 732, 414, 742, 432, 726, 445, 710, 448, 692, 449, 667, 448, 648, 444, 633, 435] }
+  ];
+  const buddyCenterEyes = [
+    { x: 451, y: 496, w: 51, h: 47, path: [390, 499, 410, 479, 427, 476, 451, 477, 473, 476, 490, 483, 507, 500, 493, 512, 474, 519, 451, 519, 426, 520, 405, 515, 390, 499] },
+    { x: 698, y: 490, w: 51, h: 47, path: [636, 493, 656, 473, 678, 470, 699, 470, 722, 468, 744, 477, 759, 494, 744, 508, 723, 515, 699, 516, 674, 516, 651, 508, 636, 493] }
+  ];
+  const poseSpecs = {
+    'main-left': { base: 0, irises: [1, 2], eyes: generatedEyes['main-left'] },
+    'main-center': { base: 3, irises: [4, 5], eyes: mainCenterEyes },
+    'main-right': { base: 6, irises: [7, 8], eyes: generatedEyes['main-right'] },
+    'buddy-left': { base: 9, irises: [10, 11], eyes: generatedEyes['buddy-left'] },
+    'buddy-center': { base: 12, irises: [13, 14], eyes: buddyCenterEyes },
+    'buddy-right': { base: 15, irises: [16, 17], eyes: generatedEyes['buddy-right'] }
+  };
+
+  const canvases = {};
+  for (const name of poseNames) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1145;
+    canvas.height = 1374;
+    canvas.className = 'pose-canvas';
+    canvas.dataset.active = String(name === 'main-center');
+    canvas.setAttribute('aria-hidden', 'true');
+    portraitWrap.appendChild(canvas);
+    canvases[name] = { canvas, ctx: canvas.getContext('2d', { alpha: false }) };
+  }
+
+  let zone = 'main';
+  let activePose = 'main-center';
+  let pointer = null;
+  let upX = 0;
+  let upY = -6;
+  let buddyX = 0;
+  let buddyY = 0;
+  let ready = false;
+  let fadeSequence = 0;
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  function clipEye(ctx, eye) {
+    ctx.beginPath();
+    if (eye.outline) {
+      ctx.moveTo(eye.outline[0], eye.outline[1]);
+      for (let i = 2; i < eye.outline.length; i += 2) ctx.lineTo(eye.outline[i], eye.outline[i + 1]);
+    } else {
+      const points = eye.path;
+      ctx.moveTo(points[0], points[1]);
+      for (let i = 2; i < points.length; i += 6) {
+        ctx.bezierCurveTo(points[i], points[i + 1], points[i + 2], points[i + 3], points[i + 4], points[i + 5]);
+      }
+    }
+    ctx.closePath();
+    ctx.clip();
+  }
+
+  function drawPose(name) {
+    if (!ready) return;
+    const spec = poseSpecs[name];
+    const ctx = canvases[name].ctx;
+    const offsetX = name.startsWith('main-') ? upX : buddyX;
+    const offsetY = name.startsWith('main-') ? upY : buddyY;
+    ctx.clearRect(0, 0, 1145, 1374);
+    ctx.drawImage(images[spec.base], 0, 0, 1145, 1374);
+    spec.eyes.forEach((eye, index) => {
+      ctx.save();
+      clipEye(ctx, eye);
+      ctx.drawImage(
+        images[spec.irises[index]],
+        eye.x - eye.w / 2 + offsetX,
+        eye.y - eye.h / 2 + offsetY,
+        eye.w,
+        eye.h
+      );
+      ctx.restore();
+    });
+  }
+
+  function contains(element, x, y) {
+    const box = element.getBoundingClientRect();
+    return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+  }
+
+  function selectPose(name) {
+    if (name !== activePose) {
+      const previous = canvases[activePose].canvas;
+      const incoming = canvases[name].canvas;
+      const sequence = ++fadeSequence;
+      // Leave the previous portrait fully visible while the new one fades over it.
+      for (const pose of poseNames) {
+        if (pose !== activePose && pose !== name) {
+          canvases[pose].canvas.dataset.active = 'false';
+          canvases[pose].canvas.style.opacity = '0';
+        }
+      }
+      previous.style.transition = 'none';
+      previous.style.opacity = '1';
+      portraitWrap.appendChild(previous);
+      drawPose(name);
+      incoming.style.transition = 'none';
+      incoming.style.opacity = '0';
+      incoming.dataset.active = 'true';
+      portraitWrap.appendChild(incoming);
+      incoming.getBoundingClientRect(); // Commit the transparent starting frame.
+      incoming.style.transition = reducedMotion.matches ? 'none' : 'opacity .32s ease-in-out';
+      requestAnimationFrame(() => {
+        if (fadeSequence === sequence) incoming.style.opacity = '1';
+      });
+      activePose = name;
+      setTimeout(() => {
+        if (fadeSequence !== sequence) return;
+        previous.dataset.active = 'false';
+        previous.style.opacity = '0';
+        incoming.style.removeProperty('opacity');
+        incoming.style.removeProperty('transition');
+      }, reducedMotion.matches ? 0 : 360);
+    }
+    buddyDisplay.dataset.pose = zone;
+    mainDisplay.dataset.active = String(zone === 'main');
+    status.textContent = labels[name];
+    portraitWrap.setAttribute('aria-label', 'Buddy ' + labels[name].toLowerCase() + ' with eyes following the pointer');
+  }
+
+  function animate() {
+    let targetUpX = 0;
+    let targetUpY = -6;
+    let targetBuddyX = 0;
+    let targetBuddyY = 0;
+    const strength = 1;
+    if (zone === 'main' && pointer) {
+      targetUpX = (pointer.x * 2 - 1) * 15 * strength;
+      targetUpY = -6 + (pointer.y * 2 - 1) * 2 * strength;
+    } else if (zone === 'buddy' && pointer) {
+      targetBuddyX = (pointer.x * 2 - 1) * 12 * strength;
+      targetBuddyY = clamp((pointer.y - .35) / .45, -1, 1) * 5 * strength;
+    }
+    const ease = reducedMotion.matches ? 1 : .16;
+    upX += (targetUpX - upX) * ease;
+    upY += (targetUpY - upY) * ease;
+    buddyX += (targetBuddyX - buddyX) * ease;
+    buddyY += (targetBuddyY - buddyY) * ease;
+    drawPose(activePose);
+    requestAnimationFrame(animate);
+  }
+
+  // Called by the macOS host, including when the pointer is on another screen.
+  window.buddySetPointer = (display, x, y) => {
+    zone = display === 'buddy' ? 'buddy' : 'main';
+    pointer = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };
+    const third = Math.min(2, Math.floor(Math.min(pointer.x, .999999) * 3));
+    selectPose(zone + '-' + directions[third]);
+  };
+
+  Promise.all(images.map(img => img.decode())).then(() => {
+    ready = true;
+    window.buddyReady = true;
+    for (const name of poseNames) drawPose(name);
+    selectPose(activePose);
+    animate();
+  }).catch(() => {
+    window.buddyReady = false;
+    status.textContent = 'Image unavailable';
+    portraitWrap.setAttribute('aria-label', 'Portrait could not be loaded');
+  });
+})();
+</script>
+</body>
+</html>
